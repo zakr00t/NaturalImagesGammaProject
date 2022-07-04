@@ -47,6 +47,19 @@ timingPanelWidth = 0.2; timingStartPos = 0.625;
 plotOptionsPanelWidth = 0.15; plotOptionsStartPos = 0.825;
 backgroundColor = 'w';
 
+%%%%%%%%%%%%%%%%%%%%%%%% Get details of images datset %%%%%%%%%%%%%%%%%%%%%
+[allExperimentalDetails,matchIndex] = getExperimentalDetails(expDate);
+if isempty(matchIndex)
+    error('Incorrect expDate');
+else
+    experimentalDetails = allExperimentalDetails{matchIndex};
+    if ~isequal(experimentalDetails{1},subjectName); error('subjectName does not match'); end
+    if ~isequal(experimentalDetails{6},protocolName); error('protocolName does not match'); end
+    set1Name = experimentalDetails{2};
+    set2Name = experimentalDetails{3};
+    imageFolderName = experimentalDetails{4};
+end
+rawImageFolder = fullfile(folderSourceString,'data','images',imageFolderName);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%% Plot Electrode Array %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -95,6 +108,7 @@ hold(hRFMapPlot,'on');
 for ii=1:numAnalogChannels
     plot(hRFMapPlot,rfData.rfStats(analogChannels(ii)).meanAzi,rfData.rfStats(analogChannels(ii)).meanEle,'marker','+','color',colorNamesAnalog{ii});
 end
+xlabel(hRFMapPlot,'Degrees'); ylabel(hRFMapPlot,'Degrees'); 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Parameters panel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -141,10 +155,16 @@ hAnalysisType = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Style','popup','String',analysisTypeString,'FontSize',fontSizeMedium);
 
 % Set Number
-setNums = '1|2';
+if ~isempty(set2Name)
+    setNums = [set1Name '|' set2Name];
+    numSets=2;
+else
+    setNums = set1Name;
+    numSets=1;
+end
 uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Position',[0 1-4*(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight], ...
-    'Style','text','String','Set Num','FontSize',fontSizeMedium);
+    'Style','text','String','Set Name','FontSize',fontSizeMedium);
 hSetNum = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'BackgroundColor', backgroundColor, 'Position',...
     [parameterTextWidth 1-4*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
@@ -309,14 +329,14 @@ uicontrol('Unit','Normalized','Position',[0 0.95 1 0.05],...
 
 % Plot handles
 [~,~,~,~,fValsUnique] = loadParameterCombinations(folderExtract);
-numPlots = length(fValsUnique)/2;
+numPlots = length(fValsUnique)/numSets;
 hImagesPlot = getPlotHandles(1,numPlots,[0.025 0.6 0.95 0.1],0.002);
-hImagePatchesPlot = getPlotHandles(1,numPlots,[0.025 0.49 0.95 0.1],0.002);
-hImagePatchPredictionPlot = getPlotHandles(1,numPlots,[0.025 0.38 0.95 0.1],0.002);
-hDataPlot = getPlotHandles(1,numPlots,[0.025 0.2 0.95 0.15],0.002);
+hImagePatchesPlot = getPlotHandles(1,numPlots,[0.025 0.45 0.95 0.1],0.002);
+hImagePatchPredictionPlot = getPlotHandles(1,numPlots,[0.025 0.3 0.95 0.1],0.002);
+hDataPlot = getPlotHandles(1,numPlots,[0.025 0.05 0.95 0.2],0.002);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% functions
+
     function plotData_Callback(~,~)
         
         analysisType = get(hAnalysisType,'val');
@@ -326,6 +346,8 @@ hDataPlot = getPlotHandles(1,numPlots,[0.025 0.2 0.95 0.15],0.002);
         referenceChannelString = referenceChannelStringArray{get(hReferenceChannel,'val')};
 
         fValsToUse = fValsUnique(numPlots*(setNum-1) + (1:numPlots));
+        
+        %%%%%%%%%%%%%%%%%%%%%%%% Plot Neural Data %%%%%%%%%%%%%%%%%%%%%%%%%
         if analysisType == 2 || analysisType == 3 % Spike Data
             channelPos = get(hSpikeChannel,'val');
             channelNumber = spikeChannels(channelPos);
@@ -335,10 +357,13 @@ hDataPlot = getPlotHandles(1,numPlots,[0.025 0.2 0.95 0.15],0.002);
         else
             analogChannelPos = get(hAnalogChannel,'val');
             analogChannelString = analogChannelStringArray{analogChannelPos};
+            
             if analogChannelPos<=length(colorNamesAnalog)
                 plotColor = colorNamesAnalog{analogChannelPos};
+                channelNumber = analogChannels(analogChannelPos);
             else
                 plotColor = 'k';
+                channelNumber=[];
             end
             plotLFPData1Channel(hDataPlot,analogChannelString,fValsToUse,folderName,...
                 analysisType,timeVals,plotColor,blRange,stRange,referenceChannelString,badTrialNameStr,useCommonBadTrialsFlag);
@@ -364,6 +389,10 @@ hDataPlot = getPlotHandles(1,numPlots,[0.025 0.2 0.95 0.15],0.002);
             set(hZMin,'String',num2str(zRange(1))); set(hZMax,'String',num2str(zRange(2)));
             rescaleZPlots(hDataPlot,zRange);
         end
+        
+        %%%%%%%%%%%%%%%%%%%%%%%% Plot the images %%%%%%%%%%%%%%%%%%%%%%%%%%
+        plotImageData(hImagesPlot,hImagePatchesPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,plotColor);
+        
     end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     function rescaleZ_Callback(~,~)
@@ -817,5 +846,26 @@ if isfield(x,'allBadTrials')
     allBadTrials=x.allBadTrials;
 else
     allBadTrials=badTrials;
+end
+end
+%%%%%%%%%%%%c%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Display Images
+function plotImageData(hImagesPlot,hImagePatches,rawImageFolder,fValsToUse,channelNumber,subjectName,colorName)
+patchSizeDeg=2;
+plottingDetails.displayPlotsFlag=1;
+
+for i=1:length(fValsToUse)
+    imageFileName = fullfile(rawImageFolder,['Image' num2str(fValsToUse(i)) '.tif']);
+    plottingDetails.hImagePlot=hImagesPlot(i);
+    plottingDetails.hImagePatches=hImagePatches(i);
+    plottingDetails.colorNames=colorName;
+    getImagePatches(imageFileName,channelNumber,subjectName,'',patchSizeDeg,plottingDetails);
+    if i>1
+        set(hImagesPlot(i),'XTicklabel',[],'YTicklabel',[]);
+        set(hImagePatches(i),'XTicklabel',[],'YTicklabel',[]);
+    else
+        xlabel(hImagesPlot(i),'Degrees'); ylabel(hImagesPlot(i),'Degrees');
+        xlabel(hImagePatches(i),'Degrees'); ylabel(hImagePatches(i),'Degrees');
+    end
 end
 end
