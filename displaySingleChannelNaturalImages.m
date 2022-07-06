@@ -377,7 +377,7 @@ hDataPlot = getPlotHandles(1,numPlots,[0.025 0.05 0.95 0.2],0.002);
             xMax = str2double(get(hFFTMax,'String'));
         end
 
-        if analysisType<=8
+        if analysisType<8
             rescaleData(hDataPlot,xMin,xMax,getYLims(hDataPlot));
         else
             yMin = str2double(get(hFFTMin,'String'));
@@ -586,14 +586,14 @@ for i=1:numPlots
             fftST = abs(fft(analogData(goodPos,stPos),[],2));
             
             if analysisType == 4
-                plot(plotHandles(i),xs,log10(mean(fftBL)),'g');
+                plot(plotHandles(i),xs,log10(mean(fftBL)),'color','k');
                 hold(plotHandles(i),'on');
-                plot(plotHandles(i),xs,log10(mean(fftST)),'k');
+                plot(plotHandles(i),xs,log10(mean(fftST)),'color',plotColor);
                 hold(plotHandles(i),'off');
             end
             
             if analysisType == 5
-                plot(plotHandles(i),xs,log10(mean(fftST))-log10(mean(fftBL)),'color',plotColor);
+                plot(plotHandles(i),xs,10*(log10(mean(fftST))-log10(mean(fftBL))),'color',plotColor);
                 hold(plotHandles(i),'on');
                 plot(plotHandles(i),xs,zeros(1,length(xs)),'color','k');
                 hold(plotHandles(i),'off');
@@ -611,7 +611,7 @@ for i=1:numPlots
             end
             
             if analysisType == 7
-                plot(plotHandles(i),xs,log10(fftERPST)-log10(fftERPBL),'color',plotColor);
+                plot(plotHandles(i),xs,10*(log10(fftERPST)-log10(fftERPBL)),'color',plotColor);
             end
             
         elseif analysisType == 8 || analysisType == 9  % TF analysis
@@ -855,7 +855,7 @@ patchSizeDeg=2;
 plottingDetails.displayPlotsFlag=1;
 
 for i=1:length(fValsToUse)
-    imageFileName = fullfile(rawImageFolder,['Image' num2str(fValsToUse(i)) '.tif']);
+    imageFileName = fullfile(rawImageFolder,['Image' num2str(fValsToUse(i)) '.png']);
     plottingDetails.hImagePlot=hImagesPlot(i);
     plottingDetails.hImagePatches=hImagePatches(i);
     plottingDetails.colorNames=colorName;
