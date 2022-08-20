@@ -44,12 +44,11 @@ else
     end
 end
 if isempty(monitorSpecifications)
-    monitorSpecifications.height = 11.8; % Monitor height in inches
-    monitorSpecifications.width  = 20.9; % Monitor width in inches
-    monitorSpecifications.xRes   = 1280; % Resolution (num of pixels) of monitor
-    monitorSpecifications.yRes   = 720; % Resolution (num of pixels) of monitor
+   [~,~,monitorSpecifications] = getMonitorDetails;
 end
-if isempty(viewingDistanceCM); viewingDistanceCM=50;                    end
+if isempty(viewingDistanceCM)
+    [~,~,~,viewingDistanceCM] = getMonitorDetails;
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Get Image Details
 inputImage = imread(imageFileName); % Get input image
@@ -110,9 +109,6 @@ set(hImagePlot,'YTick',[yAxisDeg(1) 0 yAxisDeg(end)],'YTickLabel',[round(yAxisDe
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [xAxisDeg,yAxisDeg] = getImageInDegrees(inputImage,monitorSpecifications,viewingDistanceCM)
-viewingDistance = viewingDistanceCM/2.54; % convert to inches
-yDeg = (atan((monitorSpecifications.height/2)/viewingDistance))*180/pi; % Half the space, in degrees
-xDeg = (atan((monitorSpecifications.width/2)/viewingDistance))*180/pi;
 
 % Check if the dimensions of the image match the resolution of the monitor.
 % This is when a screenshot of the image displayed by the monitor is saved.
@@ -122,8 +118,7 @@ imageYRes=size(inputImage,1);
 if ~(isequal(monitorSpecifications.xRes,imageXRes) && isequal(monitorSpecifications.yRes,imageYRes))
     % Not a screenshot. Need to resize the image. Deal with this later
     error('Not a screenshot');
+else
+    [xAxisDeg,yAxisDeg] = getMonitorDetails(monitorSpecifications,viewingDistanceCM);
 end
-
-xAxisDeg = -xDeg: (2*xDeg/imageXRes) :xDeg; xAxisDeg = xAxisDeg(1:imageXRes);
-yAxisDeg = -yDeg: (2*yDeg/imageYRes) :yDeg; yAxisDeg = yAxisDeg(1:imageYRes);
 end
