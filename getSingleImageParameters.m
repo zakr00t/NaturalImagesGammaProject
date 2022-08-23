@@ -23,12 +23,24 @@
 % radiusMatrixDeg: 1-D matrix of radii for which image properties are
 % calculated. Default: 0.3:0.3:9.6.
 
-function getSingleImageParameters(imageHSV,imageAxesDeg,rfCenterDeg,radiusMatrixDeg,displayAnalysisFlag)
+% selectOptions: contains the details of the thresholds that are used to
+% determine the size.
+% selectOptions.measure = 'diff' or 'abs'. When set to diff ,we compute the
+% mean and std of only the pixels in the disk between the current radius
+% and the preceding one. When set to 'abs', we take all pixels. Default: 'diff'
+
+function getSingleImageParameters(imageHSV,imageAxesDeg,rfCenterDeg,radiusMatrixDeg,selectOptions,displayAnalysisFlag)
 
 if ~exist('imageAxesDeg','var');        imageAxesDeg=[];                end
 if ~exist('rfCenterDeg','var');         rfCenterDeg = [0 0];            end
 if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg = 0.3:0.3:9.6;  end
 if ~exist('displayAnalysisFlag','var'); displayAnalysisFlag=1;          end    
+if ~exist('selectOptions','var');       selectOptions=[];               end
+
+%%%%%%%%%%%%%%%%%%%%%%%%% Get selection thresholds %%%%%%%%%%%%%%%%%%%%%%%%
+if isempty(selectOptions)
+    selectOptions.measure = 'diff';
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%% Get X and Y axes in degrees %%%%%%%%%%%%%%%%%%%%
 if isempty(imageAxesDeg)
@@ -61,13 +73,23 @@ else
     gaborStim.orientationDeg=0;
     gaborStim.contrastPC = 100;
 
+    goodPosPreviousRadius=false(size(imageHSV,1),size(imageHSV,2)); % Keeps the goodPos of the previous radius to perform the 'diff' computation
     for i=1:numStimuli
         gaborStim.radiusDeg=radiusMatrixDeg(i);
         [~,aperature] = makeGaborStimulus(gaborStim,xAxisDeg,yAxisDeg);
+
+        % Get goodPos
         goodPos = (aperature==1);
+        if strcmp(selectOptions.measure,'diff')
+            goodPosToUse = xor(goodPos,goodPosPreviousRadius);
+        else
+            goodPosToUse = goodPos;
+        end
+        goodPosPreviousRadius = goodPos;
+        
         for j=1:3
             tmp = squeeze(imageHSV(:,:,j));
-            goodVals = tmp(goodPos);
+            goodVals = tmp(goodPosToUse);
             
             if j==1 % Hue
                 meanList(j,i) = circ_mean(goodVals*2*pi); % Change from 0-1 to 0-2*pi 
@@ -81,6 +103,7 @@ else
 end
 
 if displayAnalysisFlag
+    colormap gray
     
     if achromaticFlag
     else
