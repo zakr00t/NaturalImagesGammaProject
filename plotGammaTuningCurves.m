@@ -32,8 +32,9 @@ else
     end
 end
 numVar1 = length(var1List);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%% Grating options %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 colorNameList = jet(numVar1);
-    
 if strcmp(stimParamsToDisplay,'SFOR')
     var2List = [0.5 1 2 4 8]; % Spatial Frequency
     numVar2 = length(var2List);
@@ -52,8 +53,9 @@ if strcmp(stimParamsToDisplay,'SFOR')
             predictedGammaList(i,j) = getPredictedGamma(subjectName,stimParamsList{i,j});
         end
     end
+end
     
-elseif strcmp(stimParamsToDisplay,'SZOR') % Size-Ori
+if strcmp(stimParamsToDisplay,'SZOR') % Size-Ori
     var2List = [0.3 0.6 1.2 2.4 4.8 9.6]; % Sizes
     numVar2 = length(var2List);
     gaborStim.spatialFreqCPD= 2;
@@ -71,7 +73,9 @@ elseif strcmp(stimParamsToDisplay,'SZOR') % Size-Ori
             predictedGammaList(i,j) = getPredictedGamma(subjectName,stimParamsList{i,j});
         end
     end
-elseif strcmp(stimParamsToDisplay,'CNOR') % Con-Ori
+end
+
+if strcmp(stimParamsToDisplay,'CNOR') % Con-Ori
     var2List = [0 3.1 6.25 12.5 25 50 100]; % Cons
     numVar2 = length(var2List);
     gaborStim.spatialFreqCPD= 2; % 
@@ -91,11 +95,95 @@ elseif strcmp(stimParamsToDisplay,'CNOR') % Con-Ori
     end
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Color options %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if strcmp(stimParamsToDisplay,'Hue')
+    var2List = 0:10:350; % Hues
+    numVar2 = length(var2List);
+    gaborStim.radiusDeg=100; % FS
+    gaborStim.contrastPC=100;
+    gaborStim.orientationDeg=0; % Does not matter since SF is zero
+    gaborStim.spatialFreqCPD=0; % For color patch
+    gaborStim.spatialFreqPhaseDeg=90;
+    gaborStim.sat = 1;
+    
+    stimParamsList = cell(numVar1,numVar2);
+    predictedGammaList = zeros(numVar1,numVar2);
+    colorNameList = [1 0 0];
+    for i=1:numVar1
+        for j=1:numVar2
+            tmpGaborStim = gaborStim;            
+            tmpGaborStim.hueDeg = var2List(j);
+                 
+            stimParamsList{i,j} = tmpGaborStim;
+            predictedGammaList(i,j) = getPredictedGamma(subjectName,stimParamsList{i,j});
+        end
+    end
+end
+
+if strcmp(stimParamsToDisplay,'Sat')
+    var2List = 0:0.25:1; % Saturation values
+    numVar2 = length(var2List);
+    gaborStim.radiusDeg=100; % FS
+    gaborStim.contrastPC=100;
+    gaborStim.orientationDeg=0; % Does not matter since SF is zero
+    gaborStim.spatialFreqCPD=0; % For color patch
+    gaborStim.spatialFreqPhaseDeg=90;
+    
+    stimParamsList = cell(numVar1,numVar2);
+    predictedGammaList = zeros(numVar1,numVar2);
+    colorNameList = zeros(numVar1,3);
+    
+    for i=1:numVar1
+        colorNameList(i,:) = hsv2rgb([var1List(i)/360 1 1]);
+        
+        for j=1:numVar2
+            tmpGaborStim = gaborStim;
+            tmpGaborStim.hueDeg = var1List(i);
+            tmpGaborStim.sat = var2List(j);
+            
+            stimParamsList{i,j} = tmpGaborStim;
+            predictedGammaList(i,j) = getPredictedGamma(subjectName,stimParamsList{i,j});
+        end
+    end
+end
+
+if strcmp(stimParamsToDisplay,'Val')
+    var2List = [0 6.25 12.5 25 50 100]; % Contrast (Value)
+    numVar2 = length(var2List);
+    gaborStim.radiusDeg=100; % FS
+    gaborStim.orientationDeg=0; % Does not matter since SF is zero
+    gaborStim.spatialFreqCPD=0; % For color patch
+    gaborStim.spatialFreqPhaseDeg=90;
+    gaborStim.sat = 1;
+    
+    stimParamsList = cell(numVar1,numVar2);
+    predictedGammaList = zeros(numVar1,numVar2);
+    colorNameList = zeros(numVar1,3);
+    
+    for i=1:numVar1
+        colorNameList(i,:) = hsv2rgb([var1List(i)/360 1 1]);
+        
+        for j=1:numVar2
+            tmpGaborStim = gaborStim;
+            tmpGaborStim.hueDeg = var1List(i);
+            tmpGaborStim.contrastPC = var2List(j);
+            
+            stimParamsList{i,j} = tmpGaborStim;
+            predictedGammaList(i,j) = getPredictedGamma(subjectName,stimParamsList{i,j});
+        end
+    end
+end
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Plot Gamma %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 hGamma = subplot('Position',[0.05 0.05 0.4 0.9]); hold(hGamma,'on');
+legendStr = cell(1,numVar1);
 for i=1:numVar1
     plot(hGamma,predictedGammaList(i,:),'color',colorNameList(i,:));
+    legendStr{i} = num2str(var1List(i));
 end
+set(hGamma,'XTick',1:length(var2List),'XTickLabel',var2List);
+legend(hGamma,legendStr,'location','best');
 
 %%%%%%%%%%%%%%%%%%%%%%% Display Stimuli %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if displayStimuliFlag
@@ -103,13 +191,15 @@ if displayStimuliFlag
     
     % Each stimulus must be of the size specified by monitorSpecifications.
     [xAxisDeg,yAxisDeg] = getMonitorDetails;
+    xAxisDeg = downsample(xAxisDeg,5); 
+    yAxisDeg = downsample(yAxisDeg,5);
     colormap gray
     for i=1:numVar1
         for j=1:numVar2
             gaborStim = stimParamsList{i,j};
             gaborPatch = makeGaborStimulus(gaborStim,xAxisDeg,yAxisDeg,0);
-            pcolor(hStimuli(i,j),xAxisDeg,yAxisDeg,gaborPatch);
-            shading(hStimuli(i,j),'interp'); caxis(hStimuli(i,j),[0 100]);
+            imagesc(xAxisDeg,yAxisDeg,gaborPatch,'Parent',hStimuli(i,j));
+            caxis(hStimuli(i,j),[0 1]);
         end
     end
 end
