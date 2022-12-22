@@ -12,7 +12,7 @@
 % monitorSpecifications - details of the monitor. Needed to convert from pixel to degrees space. 
 % viewingDistanceCM - viewing distance in centimeters. 
 
-function patchData = getImagePatches(imageFileName,electrodeList,subjectName,folderSourceString,patchSizeDeg,plottingDetails,monitorSpecifications,viewingDistanceCM)
+function [patchData,imageAxesDeg] = getImagePatches(imageFileName,electrodeList,subjectName,folderSourceString,patchSizeDeg,plottingDetails,monitorSpecifications,viewingDistanceCM)
 
 if ~exist('folderSourceString','var');  folderSourceString='';          end
 if ~exist('patchSizeDeg','var');        patchSizeDeg=[];                end
@@ -60,6 +60,8 @@ rfData = load(fullfile(folderSourceString,'data','rfData',subjectName,[subjectNa
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Get Patch Data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 xResDeg = xAxisDeg(2)-xAxisDeg(1); xPosToTake = round(patchSizeDeg/xResDeg);
 yResDeg = yAxisDeg(2)-yAxisDeg(1); yPosToTake = round(patchSizeDeg/yResDeg);
+imageAxesDeg.xAxisDeg = xResDeg * (-xPosToTake:xPosToTake);
+imageAxesDeg.yAxisDeg = yResDeg * (-yPosToTake:yPosToTake);
 patchData = cell(1,numElectrodes);
 
 if displayPlotsFlag

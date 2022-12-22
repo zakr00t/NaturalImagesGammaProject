@@ -5,11 +5,13 @@
 % Color patch
 gaborStim.azimuthDeg=0;
 gaborStim.elevationDeg=0;
-gaborStim.spatialFreqCPD=1;
+
 gaborStim.sigmaDeg=100000;
 gaborStim.orientationDeg=0;
-gaborStim.contrastPC = 100;
-gaborStim.spatialFreqPhaseDeg=0; % For color patches, SF=0 and SFphase=90
+gaborStim.contrastPC = 25;
+
+gaborStim.spatialFreqCPD=0;
+gaborStim.spatialFreqPhaseDeg=90; % For color patches, SF=0 and SFphase=90
 
 gaborStim.radiusDeg=5;
 gaborStim.hueDeg=45;
@@ -21,4 +23,4 @@ imageAxesDeg.xAxisDeg=xAxisDeg;
 imageAxesDeg.yAxisDeg=yAxisDeg;
 rfCenterDeg=[gaborStim.azimuthDeg gaborStim.elevationDeg];
 
-getSingleImageParameters(rgb2hsv(imageRGB),imageAxesDeg,rfCenterDeg);
+params = getSingleImageParameters_2(rgb2hsv(imageRGB),imageAxesDeg,rfCenterDeg);

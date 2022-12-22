@@ -330,10 +330,16 @@ uicontrol('Unit','Normalized','Position',[0 0.95 1 0.05],...
 % Plot handles
 [~,~,~,~,fValsUnique] = loadParameterCombinations(folderExtract);
 numPlots = length(fValsUnique)/numSets;
-hImagesPlot = getPlotHandles(1,numPlots,[0.025 0.6 0.95 0.1],0.002);
-hImagePatchesPlot = getPlotHandles(1,numPlots,[0.025 0.45 0.95 0.1],0.002);
-hImagePatchPredictionPlot = getPlotHandles(1,numPlots,[0.025 0.3 0.95 0.1],0.002);
-hDataPlot = getPlotHandles(1,numPlots,[0.025 0.05 0.95 0.2],0.002);
+hImagesPlot = getPlotHandles(1,numPlots,[0.025 0.6 0.75 0.1],0.002);
+hImagePatchesPlot = getPlotHandles(1,numPlots,[0.025 0.45 0.75 0.1],0.002);
+hImagePatchPredictionPlot = getPlotHandles(1,numPlots,[0.025 0.3 0.75 0.1],0.002);
+hDataPlot = getPlotHandles(1,numPlots,[0.025 0.05 0.75 0.2],0.002);
+
+% Show actual versus predicted power
+[powerST,~,electrodeListPower] = getMeanEnergy(subjectName,expDate,protocolName);
+hPowerPredictionPlot = subplot('Position',[0.825 0.45 0.15 0.25]);
+hCorrelationPlotFull = subplot('Position',[0.825 0.225 0.15 0.125]);
+hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.125]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -390,9 +396,35 @@ hDataPlot = getPlotHandles(1,numPlots,[0.025 0.05 0.95 0.2],0.002);
             rescaleZPlots(hDataPlot,zRange);
         end
         
-        %%%%%%%%%%%%%%%%%%%%%%%% Plot the images %%%%%%%%%%%%%%%%%%%%%%%%%%
-        plotImageData(hImagesPlot,hImagePatchesPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,plotColor);
+        %%%%%%%%%%% Plot the images and their predictions %%%%%%%%%%%%%%%%%
+        allStimParams = plotImageData(hImagesPlot,hImagePatchesPlot,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,plotColor);
+        allPower = squeeze(powerST(:,electrodeListPower==channelNumber,fValsToUse)); % Actual power
+        [correlationsFull, correlationsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower);
         
+        numStimuli = length(allStimParams);
+        colorNamesPower = jet(numStimuli);
+        cla(hPowerPredictionPlot);
+        hold(hPowerPredictionPlot,'on');
+        for i=1:numStimuli
+            title(hImagesPlot(i),num2str(i),'color',colorNamesPower(i,:));
+            if isempty(intersect(i,selectedImageIndices)) % Not a selected image
+                plot(hPowerPredictionPlot,allPower(i),predictedPower(i),'marker','o','color',colorNamesPower(i,:));
+            else
+                plot(hPowerPredictionPlot,allPower(i),predictedPower(i),'marker','o','color',colorNamesPower(i,:),'markerfacecolor',colorNamesPower(i,:));
+            end
+        end
+        title(hPowerPredictionPlot,['rFull: ' num2str(round(correlationsFull(6),2)) ', rSel(N=' num2str(length(selectedImageIndices)) '):' num2str(round(correlationsSelected(6),2))]);
+        xlabel(hPowerPredictionPlot,'Actual Gamma'); ylabel(hPowerPredictionPlot,'Predicted Gamma'); 
+        
+        bar(correlationsFull,'Parent',hCorrelationPlotFull);
+        set(hCorrelationPlotFull,'XTickLabel',[]);
+        title(hCorrelationPlotFull,'Full set');
+        ylim(hCorrelationPlotFull,[0 1]);
+        
+        bar(correlationsSelected,'Parent',hCorrelationPlotSelected);
+        set(hCorrelationPlotSelected,'XTickLabel',predictionString);
+        title(hCorrelationPlotSelected,'Selected set');
+        ylim(hCorrelationPlotSelected,[0 1]);
     end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     function rescaleZ_Callback(~,~)
@@ -474,6 +506,10 @@ hDataPlot = getPlotHandles(1,numPlots,[0.025 0.05 0.95 0.2],0.002);
         claGivenPlotHandle(hImagePatchPredictionPlot);
         claGivenPlotHandle(hDataPlot);
    
+        cla(hPowerPredictionPlot);
+        cla(hCorrelationPlotFull);
+        cla(hCorrelationPlotSelected);
+        
         function claGivenPlotHandle(plotHandles)
             [numRows,numCols] = size(plotHandles);
             for i=1:numRows
@@ -850,22 +886,53 @@ end
 end
 %%%%%%%%%%%%c%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Display Images
-function plotImageData(hImagesPlot,hImagePatches,rawImageFolder,fValsToUse,channelNumber,subjectName,colorName)
+function allStimParams = plotImageData(hImagesPlot,hImagePatches,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,colorName)
 patchSizeDeg=2;
 plottingDetails.displayPlotsFlag=1;
 
-for i=1:length(fValsToUse)
+% Setting up standard gaborStimulus which is a patch (spatial frequency of
+% zero and phase of 90 degrees)
+gaborStim.orientationDeg=0; % Does not matter since SF is zero
+gaborStim.spatialFreqCPD=0; % For color patch
+gaborStim.spatialFreqPhaseDeg=90;
+gaborStim.azimuthDeg=0;
+gaborStim.elevationDeg=0;
+gaborStim.sigmaDeg=100000; % The program makeGaborStimulus actually produces Gabors. However, when sigma is extremely large, it is essentially a grating whose radius is defined by another parameter
+
+numImages = length(fValsToUse);
+allStimParams = cell(1,numImages);
+for i=1:numImages
     imageFileName = fullfile(rawImageFolder,['Image' num2str(fValsToUse(i)) '.png']);
     plottingDetails.hImagePlot=hImagesPlot(i);
     plottingDetails.hImagePatches=hImagePatches(i);
     plottingDetails.colorNames=colorName;
-    getImagePatches(imageFileName,channelNumber,subjectName,'',patchSizeDeg,plottingDetails);
+    [patchData,imageAxesDeg] = getImagePatches(imageFileName,channelNumber,subjectName,'',patchSizeDeg,plottingDetails);
+    
+    tmpParams = getSingleImageParameters_2(rgb2hsv(patchData{1}),imageAxesDeg,[0 0],patchSizeDeg,[],0);
+    stimParams.hueDeg = tmpParams(1)*360;
+    stimParams.sat = tmpParams(2);
+    stimParams.contrastPC = tmpParams(3)*100;
+    stimParams.radiusDeg = tmpParams(4);
+
+    allStimParams{i} = stimParams;
+    
+    tmpGaborStim = gaborStim;
+    tmpGaborStim.hueDeg = stimParams.hueDeg;
+    tmpGaborStim.sat = stimParams.sat;
+    tmpGaborStim.contrastPC = stimParams.contrastPC;
+    tmpGaborStim.radiusDeg = stimParams.radiusDeg;
+    
+    tmpGaborPatch = makeGaborStimulus(tmpGaborStim,imageAxesDeg.xAxisDeg,imageAxesDeg.yAxisDeg,0);
+    image([-patchSizeDeg patchSizeDeg],[-patchSizeDeg patchSizeDeg],tmpGaborPatch,'Parent',hImagePatchPredictionPlot(i));
+    
     if i>1
         set(hImagesPlot(i),'XTicklabel',[],'YTicklabel',[]);
         set(hImagePatches(i),'XTicklabel',[],'YTicklabel',[]);
+        set(hImagePatchPredictionPlot(i),'XTicklabel',[],'YTicklabel',[]);
     else
         xlabel(hImagesPlot(i),'Degrees'); ylabel(hImagesPlot(i),'Degrees');
         xlabel(hImagePatches(i),'Degrees'); ylabel(hImagePatches(i),'Degrees');
+        xlabel(hImagePatchPredictionPlot(i),'Degrees'); ylabel(hImagePatchPredictionPlot(i),'Degrees');
     end
 end
 end
