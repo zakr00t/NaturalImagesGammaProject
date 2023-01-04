@@ -36,11 +36,13 @@ if isempty(plottingDetails)
     colorNames = jet(numElectrodes);
 else
     displayPlotsFlag = plottingDetails.displayPlotsFlag;
-    hImagePlot = plottingDetails.hImagePlot;
-    hImagePatches = plottingDetails.hImagePatches;
-    colorNames = plottingDetails.colorNames;
-    if length(hImagePatches) ~= numElectrodes
-        error('Number of image patch plothandles must be equal to the number of electrodes');
+    if displayPlotsFlag
+        hImagePlot = plottingDetails.hImagePlot;
+        hImagePatches = plottingDetails.hImagePatches;
+        colorNames = plottingDetails.colorNames;
+        if length(hImagePatches) ~= numElectrodes
+            error('Number of image patch plothandles must be equal to the number of electrodes');
+        end
     end
 end
 if isempty(monitorSpecifications)
@@ -105,9 +107,11 @@ for i=1:numElectrodes
         axis(hImagePatches(i),'tight');
     end
 end
-axis(hImagePlot,'tight');
-set(hImagePlot,'XTick',[xAxisDeg(1) 0 xAxisDeg(end)],'XTickLabel',[round(xAxisDeg(1),2) 0 round(xAxisDeg(end),2)]);
-set(hImagePlot,'YTick',[yAxisDeg(1) 0 yAxisDeg(end)],'YTickLabel',[round(yAxisDeg(end),2) 0 round(yAxisDeg(1),2)]);
+if displayPlotsFlag
+    axis(hImagePlot,'tight');
+    set(hImagePlot,'XTick',[xAxisDeg(1) 0 xAxisDeg(end)],'XTickLabel',[round(xAxisDeg(1),2) 0 round(xAxisDeg(end),2)]);
+    set(hImagePlot,'YTick',[yAxisDeg(1) 0 yAxisDeg(end)],'YTickLabel',[round(yAxisDeg(end),2) 0 round(yAxisDeg(1),2)]);
+end
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [xAxisDeg,yAxisDeg] = getImageInDegrees(inputImage,monitorSpecifications,viewingDistanceCM)
