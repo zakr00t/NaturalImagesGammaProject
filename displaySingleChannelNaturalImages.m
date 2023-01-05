@@ -908,11 +908,13 @@ for i=1:numImages
     plottingDetails.colorNames=colorName;
     [patchData,imageAxesDeg] = getImagePatches(imageFileName,channelNumber,subjectName,'',patchSizeDeg,plottingDetails);
     
-    tmpParams = getSingleImageParameters_2(rgb2hsv(patchData{1}),imageAxesDeg,[0 0],(0.3:0.3:patchSizeDeg),[],0);
-    stimParams.hueDeg = tmpParams(1)*360;
-    stimParams.sat = tmpParams(2);
-    stimParams.contrastPC = tmpParams(3)*100;
-    stimParams.radiusDeg = tmpParams(4);
+
+    tmpParams = getSingleImageParameters_2(rgb2hsv(patchData{1}), imageAxesDeg, [rfData.rfStats(channelNumber).meanAzi, rfData.rfStats(channelNumber).meanEle], 0.3:0.3:9.6, [], 0);
+    
+    stimParams.hueDeg = tmpParams.hueDeg;
+    stimParams.sat = tmpParams.saturation;
+    stimParams.contrastPC = tmpParams.value*1000;
+    stimParams.radiusDeg = tmpParams.radiusDeg;
 
     allStimParams{i} = stimParams;
     
