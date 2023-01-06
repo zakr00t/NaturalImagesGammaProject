@@ -4,7 +4,9 @@
 % Inputs
 % Required
 % subjectName: 'alpaH' or 'kesariH'
-% stimParams: description of an achromatic or chromatic grating 
+% stimParams: description of an achromatic or chromatic grating or a patch, with the following fields
+%    gratings: spatialFreqCPD(1 2 4 etc), orientationDeg(0 to 180), radiusDeg, contrastPC (0 to 100)
+%    hsv patches: hueDeg (0 to 360), radiusDeg, sat (saturation 0 to 1), contrastPC(value. 0 to 100 as percentage)
 
 % Optional
 % modelParams: model parameters to construct the tuning functions. If not
@@ -12,9 +14,8 @@
 % scalingFactor: the overall gamma is scaled by scalingFactor(1) and then
 % an offset of scalingFactor(2) is added. Default: [1 0]
 % if actual data (a vector of values of same length as number of stimuli) is sent in as scaling factor,
-% then this dats is used to get overall gain and offset on scaled predictions 
+% then this data is used to get overall gain and offset on scaled predictions 
 
-% Modified by STK. Only hue pipeline is modified as of now.
 
 function gammaVal = getPredictedGamma(subjectName,stimParams,modelParams,scalingFactor)
 
@@ -31,24 +32,24 @@ function val = getPredictedGammaGrating(subjectName,stimParams,modelParams,scali
 
 if isempty(modelParams)
     if strcmp(subjectName,'alpaH')
-        modelParams.sfCenter = 2.9399;
-        modelParams.sfSigma = 1.1339;
-        modelParams.oriCenter = 1.9133;
-        modelParams.oriSpreadK = 0.51753;
-        modelParams.sizeSlope = 0.38268;
-        modelParams.sizeAtHalfMax = 1.664;
-        modelParams.conSlope = 1.3317;
-        modelParams.conAtHalfMax = 2.637;
+        modelParams.sfCenter = 5.0196;
+        modelParams.sfSigma = 0.9413;
+        modelParams.oriCenter = 110.3286;
+        modelParams.oriSpreadK = 1.0302;
+        modelParams.sizeSlope = 0.3674;
+        modelParams.sizeAtHalfMax = 1.2904;
+        modelParams.conSlope = 1.4808;
+        modelParams.conAtHalfMax = 22.8935;
         
     elseif strcmp(subjectName,'kesariH')
-        modelParams.sfCenter = 1.5304;
-        modelParams.sfSigma = 1.1500;
-        modelParams.oriCenter =  0.5558;   
-        modelParams.oriSpreadK = 0.2498;
-        modelParams.sizeSlope = 0.0580;
-        modelParams.sizeAtHalfMax = 5.0000;
-        modelParams.conSlope = 9.6000;
-        modelParams.conAtHalfMax = 2.0433;       
+        modelParams.sfCenter = 2.8280;
+        modelParams.sfSigma = 1.0938;
+        modelParams.oriCenter =  28.2081;   
+        modelParams.oriSpreadK = 0.1552;
+        modelParams.sizeSlope = 8.1988;
+        modelParams.sizeAtHalfMax = 0.4874;
+        modelParams.conSlope = 1.1467;
+        modelParams.conAtHalfMax = 27.4072;       
     end
 end
 
@@ -57,42 +58,53 @@ o = stimParams.orientationDeg;
 s = stimParams.radiusDeg;
 c = stimParams.contrastPC;
 
-sfVal = normpdf(log2(f),modelParams.sfCenter,modelParams.sfSigma)./normpdf(modelParams.sfCenter,modelParams.sfCenter,modelParams.sfSigma);
-oriVal = circ_vmpdf(2*deg2rad(o),2*modelParams.oriCenter,modelParams.oriSpreadK)./circ_vmpdf(2*modelParams.oriCenter,2*modelParams.oriCenter,modelParams.oriSpreadK);
-sizeVal = sigmoidalFunction(log2(s),[modelParams.sizeSlope modelParams.sizeAtHalfMax]);
-conVal = sigmoidalFunction(log2(c),[modelParams.conSlope modelParams.conAtHalfMax]);
+sfCoeffs   = [modelParams.sfCenter modelParams.sfSigma];
+oriCoeffs  = [modelParams.oriCenter modelParams.oriSpreadK];
+sizeCoeffs = [modelParams.sizeSlope modelParams.sizeAtHalfMax];
+conCoeffs  = [modelParams.conSlope modelParams.conAtHalfMax];
 
-% Predicted gamma
-val = scalingFactor(1).*sfVal.*oriVal.*sizeVal.*conVal + scalingFactor(2);
+sfVal   = gaussianFunctionOfLogx(f,sfCoeffs);   %        
+oriVal  = vmFunctionOf2Radx(o,oriCoeffs);
+sizeVal = sigmoidalFunctionOfLogx(s,sizeCoeffs); %     
+conVal  = sigmoidalFunctionOfLogx(c,conCoeffs); 
+
+% get predicted gamma - scaled without gain
+val = 1.*sfVal.*oriVal.*sizeVal.*conVal + 0;
+% get gain and intercept if data available
+if length(scalingFactor)>2 && length(scalingFactor(:))==length(val) 
+    actualData = scalingFactor(:);
+    scalingFactor = fitGandO(actualData,val(:)); % get actual scaling factor
+    val = scalingFactor(1).*sfVal.*oriVal.*sizeVal.*conVal + scalingFactor(2); % 
+end
 end
 function val = getPredictedGammaHue(subjectName,stimParams,modelParams,scalingFactor)
 
 if isempty(modelParams)
     if strcmp(subjectName,'alpaH')
-        modelParams.centerR = 5.9925;
-        modelParams.spreadR = 1.8473;
-        modelParams.centerC = 3.0529;
-        modelParams.spreadC = 2.5153;
-        modelParams.gainCbyR = 0.4259;
-        modelParams.sizeSlope = 1.4496;
-        modelParams.sizeAtHalfMax = 0.4119;
+        modelParams.centerR = 5.9789;
+        modelParams.spreadR = 1.9068;
+        modelParams.centerC = 3.0042;
+        modelParams.spreadC = 2.5095;
+        modelParams.gainCbyR = 0.4335;
+        modelParams.sizeSlope = 1.6175;
+        modelParams.sizeAtHalfMax = 1.2119;
         modelParams.satSlope = 3.2922;
         modelParams.satAtHalfMax = 0.7477;
-        modelParams.valSlope = 0.0041;
-        modelParams.valIntercept = 1.4746;
+        modelParams.valSlope = 0.1821; 
+        modelParams.valIntercept = 0.7773;
         
     elseif strcmp(subjectName,'kesariH')
-        modelParams.centerR = 6.2428;
-        modelParams.spreadR = 4.0667;
-        modelParams.centerC = 3.8399;
-        modelParams.spreadC = 2.0575;    
-        modelParams.gainCbyR = 0.3909;
+        modelParams.centerR = 6.2326;
+        modelParams.spreadR = 4.2599;
+        modelParams.centerC = 3.7618;
+        modelParams.spreadC = 1.8884;    
+        modelParams.gainCbyR = 0.4030;
         modelParams.sizeSlope = 0.9333;
         modelParams.sizeAtHalfMax = 0.2258;
         modelParams.satSlope = 4.2867;
         modelParams.satAtHalfMax = 0.6463; 
-        modelParams.valSlope = 1.7862e-05;
-        modelParams.valIntercept = 2.7213;     
+        modelParams.valSlope = 5.9836e-04;
+        modelParams.valIntercept = 0.9329;     
     end
 end
 
@@ -122,9 +134,20 @@ if length(scalingFactor)>2 && length(scalingFactor(:))==length(val)
 end
 
 end
-function y = sigmoidalFunction(x,coeff)
-slope = coeff(1); offset = coeff(2);
-y = 1./(1+10.^(slope*(x-offset)));
+
+function [y,gaussianFunctionStr] = gaussianFunctionOfLogx(x,coeff)
+if ~exist('x','var'), x = 0; end
+if ~exist('coeff','var'), coeff = [0 1]; end  % mu = coeff(1); sigma = coeff(2);
+gaussianFunction = @(coeff,x) normpdf(log2(x),log2(coeff(1)),coeff(2))./normpdf(log2(coeff(1)),log2(coeff(1)),coeff(2)) ;  % scaled so max is 1
+y = gaussianFunction(coeff,x);
+gaussianFunctionStr = func2str(gaussianFunction);
+end
+function [y,vmFunctionStr] = vmFunctionOf2Radx(x,coeff)
+if ~exist('x','var'), x = 0; end
+if ~exist('coeff','var'), coeff = [0 1]; end  % thetaPreferred = coeff(1). concentration parameter =coeff(2)
+vmFunction= @(coeff,x) circ_vmpdf(2*deg2rad(x),2*deg2rad(coeff(1)),coeff(2))./circ_vmpdf(2*deg2rad(coeff(1)),2*deg2rad(coeff(1)),coeff(2));  %  scaled so max is 1
+y = vmFunction(coeff,x);
+vmFunctionStr = func2str(vmFunction);
 end
 function [y,sigmoidFunctionStr] = sigmoidalFunctionOfLogx(x,coeff)
 if ~exist('x','var'), x = 1; end
