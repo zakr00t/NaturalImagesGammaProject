@@ -26,12 +26,7 @@ for i=1:numImages
     
     % Get Stim Parameters
     for j=1:numElectrodes
-        tmpParams = getSingleImageParameters_2(rgb2hsv(patchData{j}),imageAxesDeg,[0 0],(0.3:0.3:patchSizeDeg),[],0);
-        stimParams.hueDeg = tmpParams(1)*360;
-        stimParams.sat = tmpParams(2);
-        stimParams.contrastPC = tmpParams(3)*100;
-        stimParams.radiusDeg = tmpParams(4);
-        
+        stimParams = getSingleImageParameters(rgb2hsv(patchData{j}),imageAxesDeg,[0 0],(0.3:0.3:patchSizeDeg),[],0);
         allStimParams{j,i} = stimParams;
     end
 end

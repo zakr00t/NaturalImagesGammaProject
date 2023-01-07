@@ -23,4 +23,4 @@ imageAxesDeg.xAxisDeg=xAxisDeg;
 imageAxesDeg.yAxisDeg=yAxisDeg;
 rfCenterDeg=[gaborStim.azimuthDeg gaborStim.elevationDeg];
 
-params = getSingleImageParameters_2(rgb2hsv(imageRGB),imageAxesDeg,rfCenterDeg);
+params = getSingleImageParameters(rgb2hsv(imageRGB),imageAxesDeg,rfCenterDeg);

@@ -11,23 +11,20 @@
 %          rfStats: rf Centers for the electrodes  
 %          psdST,psdBL: PSDs
 %          freqVals: frequency axis
-%          deltaBandPwr: power in frequency range normalised by baseline
-%          power in that range powerST./powerBL
 
 % STK 240822
 % Modified by SR 260922 - simplified so that it only works with the images
 % dataset now, and only saves mean energy
-% STK 211222 - with 1 taper & add output deltaBandPwr. flag for dropping
-% bad line fs
+% STK 211222 - with 1 taper and flag for removing line noise frequencies
 
-function [powerST,powerBL,electrodeList,rfStats,psdST,psdBL,freqVals,deltaBandPwr] = getMeanEnergy(subjectName,expDate,protocolName,folderSourceString,freqRangeList,tBL,tST,fBadFlag)
+function [powerST,powerBL,electrodeList,rfStats,psdST,psdBL,freqVals] = getMeanEnergy(subjectName,expDate,protocolName,folderSourceString,freqRangeList,tBL,tST,fBadFlag)
 
 gridType = 'Microelectrode';
 if ~exist('folderSourceString','var');  folderSourceString = '';        end
 if ~exist('freqRangeList','var'),       freqRangeList = [];             end
 if ~exist('tBL','var'),                 tBL = [-0.25 0];                end
 if ~exist('tST','var'),                 tST = [0.25 0.5];               end
-if ~exist('fBadFlag','var'),            fBadFlag = 0;                   end % to drop bad line fs or not            
+if ~exist('fBadFlag','var'),            fBadFlag = 0;                   end % to drop bad line noise frequencies          
 
 if isempty(folderSourceString)
     folderSourceString = fileparts(pwd);
@@ -61,10 +58,7 @@ for i=1:numFreqRanges
     powerST(i,:,:) = sum(psdST(:,:,goodFreqPosList{i}),3);
     powerBL(i,:,:) = sum(psdBL(:,:,goodFreqPosList{i}),3);
 end
-deltaBandPwr = powerST./powerBL;
-
 end
-
 function badFreqPos = getBadFreqPos(freqVals,deltaF)
 badFreqs = 50:50:max(freqVals);
 if nargin<2; deltaF = 2; end
@@ -76,8 +70,9 @@ end
 function goodFreqPosList = getGoodFreqPos(freqRangeList,freqVals,fBadFlag)
 numFreqRanges = length(freqRangeList);
 if fBadFlag
-     badFreqPos = getBadFreqPos(freqVals);
-else badFreqPos=[];
+    badFreqPos = getBadFreqPos(freqVals);
+else
+    badFreqPos=[];
 end
 goodFreqPosList = cell(1,numFreqRanges);
 for i=1:numFreqRanges

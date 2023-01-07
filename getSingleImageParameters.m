@@ -48,17 +48,17 @@
 %two plots are desired
 
 % precomputed indices to pass the 1D NUMERICAL indices , where the 2D mask 
-
 % values are 1. This offers a significant speedup since the masks (which 
 % are the same for different images) need not be recomputed every time
 
-% typical usage to obtain HSVR:  getSingleImageParameters_2(imageHSV, imageAxesDeg, rfCenterDeg, 0.3:0.3:9.6, [], 0,patch)  ;
+% typical usage to obtain HSVR:  getSingleImageParameters(imageHSV, imageAxesDeg, rfCenterDeg, 0.3:0.3:9.6, [], 0,patch)  ;
 % where patch would have been computed as function [patch,~]=getMaskIndices(0.3:0.3:9.6,rfCenterDeg,xAxisDeg,yAxisDeg,'diff')
 % or alernatively patch can be left empty, and will be computed in the function
 
 % Usage to Check particular patch approximations.
-% getSingleImageParameters_2(imagehsv, [], [2.0,-3]).
-function stimParams = getSingleImageParameters_2(imageHSV,imageAxesDeg,rfCenterDeg,radiusMatrixDeg,selectOptions,displayAnalysisFlag,precomputed_indices)
+% getSingleImageParameters(imagehsv, [], [2 -3]).
+
+function stimParams = getSingleImageParameters(imageHSV,imageAxesDeg,rfCenterDeg,radiusMatrixDeg,selectOptions,displayAnalysisFlag,precomputed_indices)
 
 %set default Values%
 if ~exist('imageAxesDeg','var');        imageAxesDeg=[];                end
@@ -68,7 +68,6 @@ if ~exist('displayAnalysisFlag','var'); displayAnalysisFlag=1;          end
 if ~exist('selectOptions','var');       selectOptions=[];               end
 if ~exist('precomputed_indices','var'); precomputed_indices={};         end
 numRadii = length(radiusMatrixDeg);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%% Get selection thresholds %%%%%%%%%%%%%%%%%%%%%%%%
 if isempty(selectOptions)
@@ -101,11 +100,6 @@ if isempty(precomputed_indices)
    [precomputed_indices,largest_aperture]=getMaskIndices(radiusMatrixDeg,rfCenterDeg,xAxisDeg,yAxisDeg,selectOptions.measure);
 end
 
-%%%%%%%%%%%%%%%%%% Check if the image is achromatic %%%%%%%%%%%%%%%%%%%%%%%
-achromaticFlag=0;
-if achromaticFlag
-    return
-end
 %%%%%%%%%%%%%%%%%%%%%%%% Variable  initializations %%%%%%%%%%%%%%%%%%%%%%%%
 if displayAnalysisFlag
     meanList = zeros(3,numRadii);
@@ -120,7 +114,6 @@ goodPosToUse=precomputed_indices{1};
 %%%%%%%%%%%%%%%%%%%%%%%%%% Parameter Computation %%%%%%%%%%%%%%%%%%%%%%%%%% 
 
 for i=1:numRadii    
-    
     goodPosToUse =precomputed_indices{i}; 
     [mean_val,std_val,HSV_diff]=getPatch_MeanStd(imageHSV,goodPosToUse,centralMean);
 
@@ -130,8 +123,10 @@ for i=1:numRadii
     end
 
     if(stop_flag<0 || stop_flag>=selectOptions.stop_max)
-        if displayAnalysisFlag continue    
-        else break;
+        if displayAnalysisFlag 
+            continue    
+        else
+            break;
         end
     end
 
@@ -183,19 +178,19 @@ for i=1:numRadii
     end
 end
 
-
 if r_idx<1 % even patches which are highly variable in the beginning to be chosen
     r_idx=1;
 end
 if r_idx == 0
     error("r = 0, no suitable patch approx. possible. Consider increasing std_thr."); 
     % While computing r for meanList, it is impossible to go below 1. This is because deviation is considered w.r.t. to the 1st value, and can only exceed the threshold as early as r = 2. For std, as early as r = 1 we can go above std_thr.
-    stimParams.radiusDeg = nan;    stimParams.hueDeg = nan;    stimParams.saturation = nan;    stimParams.value = nan;
+    stimParams.radiusDeg = nan;    stimParams.hueDeg = nan;    stimParams.sat = nan;    stimParams.contrastPC = nan;
 else
     stimParams.radiusDeg = radiusMatrixDeg(r_idx);
     goodPosToUse=getMaskIndices(stimParams.radiusDeg,rfCenterDeg,xAxisDeg,yAxisDeg,'abs');
-    [stimParams.hueDeg, stimParams.saturation,stimParams.value ] =computePatchAvgHSV(imageHSV,goodPosToUse{1},selectOptions.method);
-    stimParams.hueDeg=stimParams.hueDeg*360;
+    [hueDeg, stimParams.sat,val] =computePatchAvgHSV(imageHSV,goodPosToUse{1},selectOptions.method);
+    stimParams.hueDeg=hueDeg*360;
+    stimParams.contrastPC = val*100;
 end
 
 if displayAnalysisFlag==1
@@ -345,10 +340,10 @@ function Display2(imageHSV,xAxisDeg,yAxisDeg)
         ylabel("Elevation (deg)")
 end
 
-%code to display image, average values,std in HSV and concentric boundaries 
+% code to display image, average values,std in HSV and concentric boundaries 
 function Display1(imageHSV,xAxisDeg,yAxisDeg,aperture,rfCenterDeg,radiusMatrixDeg,r_idx,selectOptions,meanList,stdList,stimParams)
     numRadii=length(radiusMatrixDeg);
-    h=stimParams.hueDeg/360;  s=stimParams.saturation;  v=stimParams.value;
+    h=stimParams.hueDeg/360;  s=stimParams.sat;  v=stimParams.contrastPC/100;
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Display II %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     figure
@@ -450,4 +445,3 @@ function Display1(imageHSV,xAxisDeg,yAxisDeg,aperture,rfCenterDeg,radiusMatrixDe
         xlabel("Radius (deg)")
         ylim([0, 1])
 end
-

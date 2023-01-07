@@ -419,12 +419,12 @@ hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.125]);
         bar(correlationsFull,'Parent',hCorrelationPlotFull);
         set(hCorrelationPlotFull,'XTickLabel',[]);
         title(hCorrelationPlotFull,'Full set');
-        ylim(hCorrelationPlotFull,[0 1]);
+        ylim(hCorrelationPlotFull,[-1 1]);
         
         bar(correlationsSelected,'Parent',hCorrelationPlotSelected);
         set(hCorrelationPlotSelected,'XTickLabel',predictionString);
         title(hCorrelationPlotSelected,'Selected set');
-        ylim(hCorrelationPlotSelected,[0 1]);
+        ylim(hCorrelationPlotSelected,[-1 1]);
     end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     function rescaleZ_Callback(~,~)
@@ -908,13 +908,7 @@ for i=1:numImages
     plottingDetails.colorNames=colorName;
     [patchData,imageAxesDeg] = getImagePatches(imageFileName,channelNumber,subjectName,'',patchSizeDeg,plottingDetails);
     
-
-    tmpParams = getSingleImageParameters_2(rgb2hsv(patchData{1}), imageAxesDeg, [rfData.rfStats(channelNumber).meanAzi, rfData.rfStats(channelNumber).meanEle], 0.3:0.3:9.6, [], 0);
-    
-    stimParams.hueDeg = tmpParams.hueDeg;
-    stimParams.sat = tmpParams.saturation;
-    stimParams.contrastPC = tmpParams.value*1000;
-    stimParams.radiusDeg = tmpParams.radiusDeg;
+    stimParams = getSingleImageParameters(rgb2hsv(patchData{1}),imageAxesDeg,[0 0],(0.3:0.3:patchSizeDeg),[],0);
 
     allStimParams{i} = stimParams;
     
