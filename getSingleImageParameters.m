@@ -25,10 +25,10 @@
 
 % selectOptions: contains the details of the thresholds that are used to
 % determine the size.
-% selectOptions.mean_thr: The % +/- deviation from the initial H, S, and V 
-% value to be tolerated. Default: 5e-2 (5%)
-% selectOptions.std_thr: Similar purpose as above, but non-negative.
-% Default: 0.1 (10%, 2*mean_thr)
+% selectOptions.meanThr: The % +/- deviation from the initial H, S, and V 
+% values to be tolerated. Default: 5e-2 (5%). 1x3 array of values.
+% selectOptions.stdThr: Similar purpose as above, but non-negative.
+% Default: 0.1 (10%, 2*meanThr). 1x3 array of values.
 % selectOptions.measure = 'diff' or 'abs'. When set to diff, we compute the
 % mean and std of only the pixels in the disk between the current radius
 % and the preceding one. When set to 'abs', we take all pixels. Default: 
@@ -47,8 +47,8 @@ if ~exist('selectOptions','var');       selectOptions=[];               end
 
 %%%%%%%%%%%%%%%%%%%%%%%%% Get selection thresholds %%%%%%%%%%%%%%%%%%%%%%%%
 if isempty(selectOptions)
-    selectOptions.mean_thr = 5e-2;
-    selectOptions.std_thr = 2*selectOptions.mean_thr;
+    selectOptions.meanThr = 5e-2*ones(1, 3);
+    selectOptions.stdThr = 2*selectOptions.meanThr;
     selectOptions.measure = 'diff';
     selectOptions.method = 'vector';
 end
@@ -115,41 +115,49 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%% Parameter Computation %%%%%%%%%%%%%%%%%%%%%%%% 
 % The radius before the first radius at which a threshold is crossed is chosen:
-r_list = [];
+rList = [];
 for j = 1:3
     foo = abs(meanList(j, :) - meanList(j, 1));
     if j == 1 % Dealing with hues in radians
         foo(foo > pi) = 2*pi - foo(foo > pi); % Ensures that reflex (>180 degree) angles are replaced with their smaller counterpart. E.g., if two vectors are separated by 270deg, it is more appropriate to say they are separated by 90deg.
-        if ~isempty(min(find(foo > selectOptions.mean_thr*2*pi)))
-            r_list = [r_list, min(find(foo > selectOptions.mean_thr*2*pi)) - 1];
+        if ~isempty(min(find(foo > selectOptions.meanThr(j)*2*pi)))
+            rList = [rList, min(find(foo > selectOptions.meanThr(j)*2*pi)) - 1];
         else
-            r_list = [r_list, numStimuli]; % If all values are sub-threshold, the maximum possible radius is chosen
+            rList = [rList, numStimuli]; % If all values are sub-threshold, the maximum possible radius is chosen
         end
-        if ~isempty(min(find(stdList(j, :) > selectOptions.std_thr*2*pi)))
-            r_list = [r_list, min(find(stdList(j, :) > selectOptions.std_thr*2*pi)) - 1];
+        if ~isempty(min(find(stdList(j, :) > selectOptions.stdThr(j)*2*pi)))
+            rList = [rList, min(find(stdList(j, :) > selectOptions.stdThr(j)*2*pi)) - 1];
         else
-            r_list = [r_list, numStimuli];
+            rList = [rList, numStimuli];
         end
     else
-        if ~isempty(min(find(foo > selectOptions.mean_thr)))
-            r_list = [r_list, min(find(foo > selectOptions.mean_thr)) - 1];
+        if ~isempty(min(find(foo > selectOptions.meanThr(j))))
+            rList = [rList, min(find(foo > selectOptions.meanThr(j))) - 1];
         else
-            r_list = [r_list, numStimuli];
+            rList = [rList, numStimuli];
         end
-        if ~isempty(min(find(stdList(j, :) > selectOptions.std_thr)))
-            r_list = [r_list, min(find(stdList(j, :) > selectOptions.std_thr)) - 1];
+        if ~isempty(min(find(stdList(j, :) > selectOptions.stdThr(j))))
+            rList = [rList, min(find(stdList(j, :) > selectOptions.stdThr(j))) - 1];
         else
-            r_list = [r_list, numStimuli];
+            rList = [rList, numStimuli];
         end
     end
 end
-r_idx = min(r_list); % The index of the maximum approximation radius which doesn't deviate beyond threshold
+rIdx = min(rList); % The index of the maximum approximation radius which doesn't deviate beyond threshold
 
 % Aperture of best-fit patch:
-if r_idx == 0
-    error("r = 0, no suitable patch approx. possible. Consider increasing std_thr."); % While computing r for meanList, it is impossible to go below 1. This is because deviation is considered w.r.t. to the 1st value, and can only exceed the threshold as early as r = 2. For std, as early as r = 1 we can go above std_thr.
+if rIdx == 0
+    disp('Warning: Bad Patch, proceeding with minimum approximation...')
+    rIdx = 1;
+    %error("r = 0, no suitable patch approx. possible. Consider increasing stdThr."); % While computing r for meanList, it is impossible to go below 1. This is because deviation is considered w.r.t. to the 1st value, and can only exceed the threshold as early as r = 2. For std, as early as r = 1 we can go above stdThr.
+    %{
+    stimParams.radiusDeg = NaN;
+    stimParams.hueDeg = NaN;
+    stimParams.saturation = NaN;
+    stimParams.value = NaN;
+    %}
 else
-    gaborStim.radiusDeg = radiusMatrixDeg(r_idx);
+    gaborStim.radiusDeg = radiusMatrixDeg(rIdx);
     [~, aperture] = makeGaborStimulus(gaborStim, xAxisDeg, yAxisDeg);
 end   
 
@@ -163,18 +171,10 @@ V = V(aperture == 1);
 
 if selectOptions.method == "vector" % Vector averaging for H, S as expected in a cylindrical basis  
     N = numel(H);
-    X_tot = sum((S.*cos(2*pi*H)));
-    Y_tot = sum((S.*sin(2*pi*H)));
-    if (X_tot >= 0) && (Y_tot >= 0) % I Quadrant
-        h = atan(Y_tot/X_tot)/(2*pi);
-    elseif (X_tot < 0) && (Y_tot >= 0) % II Quadrant
-        h = 0.5 - atan(abs(Y_tot/X_tot))/(2*pi);
-    elseif (X_tot < 0) && (Y_tot < 0) % III Quadrant
-        h = 0.5 + atan(Y_tot/X_tot)/(2*pi);
-    else  % IV Quadrant
-        h = 1 - atan(abs(Y_tot/X_tot))/(2*pi);  
-    end
-    s = (((X_tot)^2 + (Y_tot)^2)^0.5)/N;
+    xTot = sum((S.*cos(2*pi*H)));
+    yTot = sum((S.*sin(2*pi*H)));
+    h = (2*pi*(atan2(yTot, xTot) < 0) + atan2(yTot, xTot))/(2*pi); % atan2 has output in radians [-pi, pi], which we convert to [0, 2pi]. This function takes care of signs so we don't have to
+    s = (((xTot)^2 + (yTot)^2)^0.5)/N;
 elseif selectOptions.method == "naive"
     if circ_mean(2*pi*H) >= 0
         h = circ_mean(2*pi*H)/(2*pi);
@@ -185,10 +185,10 @@ elseif selectOptions.method == "naive"
 end
 v = mean(V);
 
-stimParams.radiusDeg = radiusMatrixDeg(r_idx);
+stimParams.radiusDeg = radiusMatrixDeg(rIdx);
 stimParams.hueDeg = h*360;
-stimParams.saturation = s;
-stimParams.value = v;
+stimParams.sat = s;
+stimParams.contrastPC = v*100;
 
 if displayAnalysisFlag
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Display I %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -254,9 +254,9 @@ if displayAnalysisFlag
         chan2(aperture == 1) = s;
         chan3 = imageHSV(:, :, 3);
         chan3(aperture == 1) = v;
-        patch_approx = hsv2rgb(cat(3, chan1, chan2, chan3));
+        patchApprox = hsv2rgb(cat(3, chan1, chan2, chan3));
         hold on
-        imshow(flipud(patch_approx), 'XData', xAxisDeg, 'YData', yAxisDeg)
+        imshow(flipud(patchApprox), 'XData', xAxisDeg, 'YData', yAxisDeg)
         set(gca,'YDir', 'normal')
         alpha(0.7)
         % Showing concentric circles for all radii:
@@ -268,8 +268,8 @@ if displayAnalysisFlag
             params(3) = radiusMatrixDeg(i);
             params(4) = params(3);
             [~, ~, boundaryX, boundaryY] = gauss2D(params, xAxisDeg, yAxisDeg, []);
-            if i == r_idx
-                plot(boundaryX, boundaryY, '-g', 'DisplayName', sprintf("r = %0.2g", radiusMatrixDeg(r_idx))) % Highlight the patch radius
+            if i == rIdx
+                plot(boundaryX, boundaryY, '-g', 'DisplayName', sprintf("r = %0.2g", radiusMatrixDeg(rIdx))) % Highlight the patch radius
             else
                 plot(boundaryX, boundaryY, '-k', 'HandleVisibility', 'off')
             end
@@ -280,10 +280,10 @@ if displayAnalysisFlag
         polarplot(meanList(1, :), radiusMatrixDeg, 'DisplayName', 'Mean')
         hold on
         polarplot(meanList(1, 1)*ones(numStimuli), radiusMatrixDeg, '-g', 'HandleVisibility', 'off') % Initial mean value
-        polarplot((meanList(1, 1) + selectOptions.mean_thr*2*pi)*ones(numStimuli), radiusMatrixDeg, '--g', 'HandleVisibility', 'off') % Upper Bound
-        polarplot((meanList(1, 1) - selectOptions.mean_thr*2*pi)*ones(numStimuli), radiusMatrixDeg, '--g', 'HandleVisibility', 'off') % Lower Bound
+        polarplot((meanList(1, 1) + selectOptions.meanThr(1)*2*pi)*ones(numStimuli), radiusMatrixDeg, '--g', 'HandleVisibility', 'off') % Upper Bound
+        polarplot((meanList(1, 1) - selectOptions.meanThr(1)*2*pi)*ones(numStimuli), radiusMatrixDeg, '--g', 'HandleVisibility', 'off') % Lower Bound
         polarplot(stdList(1, :), radiusMatrixDeg, 'DisplayName', 'Std')
-        polarplot((selectOptions.std_thr*2*pi)*ones(numStimuli), radiusMatrixDeg, '--r', 'HandleVisibility', 'off') % Upper Bound on Std
+        polarplot((selectOptions.stdThr(1)*2*pi)*ones(numStimuli), radiusMatrixDeg, '--r', 'HandleVisibility', 'off') % Upper Bound on Std
         legend
         title("Hue (deg)")
         % For ease of viewing
@@ -298,18 +298,18 @@ if displayAnalysisFlag
         hold on
         plot(radiusMatrixDeg, meanList(2, :), 'DisplayName', 'Mean')
         yline(meanList(2, 1), '-g', 'HandleVisibility', 'off') % Initial mean value
-        if (meanList(2, 1) + selectOptions.mean_thr) <= 1    
-            yline(meanList(2, 1) + selectOptions.mean_thr, '--g', 'HandleVisibility', 'off') % Upper Bound
+        if (meanList(2, 1) + selectOptions.meanThr(2)) <= 1    
+            yline(meanList(2, 1) + selectOptions.meanThr(2), '--g', 'HandleVisibility', 'off') % Upper Bound
         else
             yline(1, '--g', 'HandleVisibility', 'off')
         end
-        if (meanList(2, 1) - selectOptions.mean_thr) >= 0     
-            yline(meanList(2, 1) - selectOptions.mean_thr, '--g',  'HandleVisibility', 'off') % Lower Bound
+        if (meanList(2, 1) - selectOptions.meanThr(2)) >= 0     
+            yline(meanList(2, 1) - selectOptions.meanThr(2), '--g',  'HandleVisibility', 'off') % Lower Bound
         else
             yline(0, '--g', 'HandleVisibility', 'off') 
         end
         plot(radiusMatrixDeg, stdList(2, :), 'DisplayName', 'Std')
-        yline(selectOptions.std_thr, '--r', 'HandleVisibility', 'off') 
+        yline(selectOptions.stdThr(2), '--r', 'HandleVisibility', 'off') 
         title("Saturation")
         legend
         xticks(radiusMatrixDeg)
@@ -319,18 +319,18 @@ if displayAnalysisFlag
         hold on
         plot(radiusMatrixDeg, meanList(3, :), 'DisplayName', 'Mean')
         yline(meanList(3, 1), '-g', 'HandleVisibility', 'off')
-        if (meanList(3, 1) + selectOptions.mean_thr) <= 1    
-            yline(meanList(3, 1) + selectOptions.mean_thr, '--g', 'HandleVisibility', 'off') % Upper Bound
+        if (meanList(3, 1) + selectOptions.meanThr(3)) <= 1    
+            yline(meanList(3, 1) + selectOptions.meanThr(3), '--g', 'HandleVisibility', 'off') % Upper Bound
         else
             yline(1, '--g', 'HandleVisibility', 'off')
         end
-        if (meanList(3, 1) - selectOptions.mean_thr) >= 0     
-            yline(meanList(3, 1) - selectOptions.mean_thr, '--g',  'HandleVisibility', 'off') % Lower Bound
+        if (meanList(3, 1) - selectOptions.meanThr(3)) >= 0     
+            yline(meanList(3, 1) - selectOptions.meanThr(3), '--g',  'HandleVisibility', 'off') % Lower Bound
         else
             yline(0, '--g', 'HandleVisibility', 'off') 
         end
         plot(radiusMatrixDeg, stdList(3, :), 'DisplayName', 'Std')
-        yline(selectOptions.std_thr, '--r', 'HandleVisibility', 'off') 
+        yline(selectOptions.stdThr(3), '--r', 'HandleVisibility', 'off') 
         legend
         title("Value/Brightness")
         xticks(radiusMatrixDeg)
