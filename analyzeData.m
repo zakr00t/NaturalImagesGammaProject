@@ -1,4 +1,4 @@
-function [correlationsFull,correlationsSelected,numSelectedImages,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,folderSourceString)
+function [correlationsFull,correlationsSelected,numSelectedImages,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,selectOptions,folderSourceString)
 
 patchSizeDeg = 2;
 plottingDetails.displayPlotsFlag=0;
@@ -26,7 +26,7 @@ for i=1:numImages
     
     % Get Stim Parameters
     for j=1:numElectrodes
-        stimParams = getSingleImageParameters(rgb2hsv(patchData{j}),imageAxesDeg,[0 0],(0.3:0.3:patchSizeDeg),[],0);
+        stimParams = getSingleImageParameters(rgb2hsv(patchData{j}),imageAxesDeg,[0 0],(0.3:0.3:patchSizeDeg),selectOptions,0);
         allStimParams{j,i} = stimParams;
     end
 end

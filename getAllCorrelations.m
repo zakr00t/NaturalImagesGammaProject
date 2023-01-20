@@ -36,6 +36,7 @@ for i=1:numStimuli
     tmp = tmpStimParams{i};
     tmp.sat = 1;
     tmp.contrastPC = 100;
+    tmp.spatialFreqPhaseDeg = 90;
     tmp.radiusDeg = rMax;
     tmpStimParams{i} = tmp;
 end
@@ -48,13 +49,14 @@ for i=1:numStimuli
     tmp = tmpStimParams{i};
     tmp.hueDeg = 0; % Choose red
     tmp.contrastPC = 100;
+    tmp.spatialFreqPhaseDeg = 90;
     tmp.radiusDeg = rMax;
     tmpStimParams{i} = tmp;
 end
 predictionString{2} = 'S';
 [correlationValsFull(2),correlationValsSelected(2)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
 
-% Only use Val
+% Only use Val - leave both contrastPC and spatialFreqPhaseDeg unchanged
 tmpStimParams = allStimParams;
 for i=1:numStimuli
     tmp = tmpStimParams{i};
@@ -71,6 +73,7 @@ tmpStimParams = allStimParams;
 for i=1:numStimuli
     tmp = tmpStimParams{i};
     tmp.contrastPC = 100;
+    tmp.spatialFreqPhaseDeg = 90;
     tmp.radiusDeg = rMax;
     tmpStimParams{i} = tmp;
 end
@@ -102,6 +105,10 @@ for i=1:numStimuli
 end
 tmp = corrcoef(allPower,predictedPower);
 rFull = tmp(1,2);
-tmp = corrcoef(allPower(selectedImageIndices),predictedPower(selectedImageIndices));
-rSelected = tmp(1,2);
+if length(selectedImageIndices)>2 % Need to have at least 3 data points. Otherwise correlations are trivially 1 or -1.
+    tmp = corrcoef(allPower(selectedImageIndices),predictedPower(selectedImageIndices));
+    rSelected = tmp(1,2);
+else
+    rSelected = 0;
+end
 end

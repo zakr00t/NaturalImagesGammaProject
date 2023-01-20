@@ -1,3 +1,7 @@
+selectOptions.meanThr = [1 1 1];
+selectOptions.stdThr = 1*selectOptions.meanThr;
+selectOptions.measure = 'diff';
+selectOptions.method = 'vector';
 
 [experimentalDetails,matchIndex] = getExperimentalDetails;
 posList = 5; % Index for which data needs to be saved
@@ -25,7 +29,7 @@ for i=1:length(posList)
         
         if ~isempty(dataType)
             disp(['Working on ' subjectName expDate protocolName ', set: ' dataType]);
-            [cFull,cSelected,numSI,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices);
+            [cFull,cSelected,numSI,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,selectOptions);
             correlationsFull = cat(2,correlationsFull,cFull);
             correlationsSelected = cat(2,correlationsSelected,cSelected);
             numSelectedImages = cat(2,numSelectedImages,numSI);

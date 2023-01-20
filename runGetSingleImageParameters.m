@@ -3,15 +3,15 @@
 %%%%%%%%%%%%%%% Make some dummy images and see how it works %%%%%%%%%%%%%%%
 
 % Color patch
-gaborStim.azimuthDeg=0;
-gaborStim.elevationDeg=0;
+gaborStim.azimuthDeg=5;
+gaborStim.elevationDeg=8;
 
 gaborStim.sigmaDeg=100000;
 gaborStim.orientationDeg=0;
-gaborStim.contrastPC = 25;
+gaborStim.contrastPC = 50;
 
 gaborStim.spatialFreqCPD=0;
-gaborStim.spatialFreqPhaseDeg=90; % For color patches, SF=0 and SFphase=90
+gaborStim.spatialFreqPhaseDeg=-90; % For color patches, SF=0 and SFphase=90 or -90
 
 gaborStim.radiusDeg=5;
 gaborStim.hueDeg=45;

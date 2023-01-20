@@ -111,7 +111,7 @@ end
 o = stimParams.hueDeg;
 s = stimParams.radiusDeg;
 st= stimParams.sat;
-v = stimParams.contrastPC/100;
+v = 0.5 * (1 + sin(deg2rad(stimParams.spatialFreqPhaseDeg))*(stimParams.contrastPC/100));
 
 hueCoeffs  = [modelParams.centerR modelParams.spreadR modelParams.centerC modelParams.spreadC  modelParams.gainCbyR];
 sizeCoeffs = [modelParams.sizeSlope modelParams.sizeAtHalfMax];

@@ -67,48 +67,42 @@ else
     yAxisDeg = imageAxesDeg.yAxisDeg;
 end
 
-%%%%%%%%%%%%%%%%%% Check if the image is achromatic %%%%%%%%%%%%%%%%%%%%%%%
-achromaticFlag=0;
+numStimuli = length(radiusMatrixDeg);
+meanList = zeros(3,numStimuli);
+stdList = zeros(3,numStimuli);
 
-if achromaticFlag
-else
-    numStimuli = length(radiusMatrixDeg);
-    meanList = zeros(3,numStimuli);
-    stdList = zeros(3,numStimuli);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Get the apertures %%%%%%%%%%%%%%%%%%%%%%%%%%
+gaborStim.azimuthDeg=rfCenterDeg(1);
+gaborStim.elevationDeg=rfCenterDeg(2);
+gaborStim.spatialFreqCPD=0; % These do not matter since we are only interested in the aperture
+gaborStim.sigmaDeg=100000;
+gaborStim.orientationDeg=0;
+gaborStim.contrastPC = 100;
+
+goodPosPreviousRadius=false(size(imageHSV,1),size(imageHSV,2)); % Keeps the goodPos of the previous radius to perform the 'diff' computation
+for i=1:numStimuli
+    gaborStim.radiusDeg=radiusMatrixDeg(i);
+    [~,aperture] = makeGaborStimulus(gaborStim,xAxisDeg,yAxisDeg);
     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%% Get the apertures %%%%%%%%%%%%%%%%%%%%%%%%%
-    gaborStim.azimuthDeg=rfCenterDeg(1);
-    gaborStim.elevationDeg=-rfCenterDeg(2);
-    gaborStim.spatialFreqCPD=0; % These do not matter since we are only interested in the aperture
-    gaborStim.sigmaDeg=100000;
-    gaborStim.orientationDeg=0;
-    gaborStim.contrastPC = 100;
-
-    goodPosPreviousRadius=false(size(imageHSV,1),size(imageHSV,2)); % Keeps the goodPos of the previous radius to perform the 'diff' computation
-    for i=1:numStimuli
-        gaborStim.radiusDeg=radiusMatrixDeg(i);
-        [~,aperture] = makeGaborStimulus(gaborStim,xAxisDeg,yAxisDeg);
-
-        % Get goodPos
-        goodPos = (aperture==1);
-        if strcmp(selectOptions.measure,'diff')
-            goodPosToUse = xor(goodPos,goodPosPreviousRadius);
-        else
-            goodPosToUse = goodPos;
-        end
-        goodPosPreviousRadius = goodPos;
+    % Get goodPos
+    goodPos = (aperture==1);
+    if strcmp(selectOptions.measure,'diff')
+        goodPosToUse = xor(goodPos,goodPosPreviousRadius);
+    else
+        goodPosToUse = goodPos;
+    end
+    goodPosPreviousRadius = goodPos;
+    
+    for j=1:3
+        tmp = squeeze(imageHSV(:,:,j));
+        goodVals = tmp(goodPosToUse);
         
-        for j=1:3
-            tmp = squeeze(imageHSV(:,:,j));
-            goodVals = tmp(goodPosToUse);
-            
-            if j==1 % Hue
-                meanList(j,i) = circ_mean(goodVals*2*pi); % Change from 0-1 to 0-2*pi 
-                stdList(j,i) = circ_std(goodVals*2*pi);
-            else
-                meanList(j,i) = mean(goodVals); 
-                stdList(j,i) = std(goodVals);
-            end
+        if j==1 % Hue
+            meanList(j,i) = circ_mean(goodVals*2*pi); % Change from 0-1 to 0-2*pi
+            stdList(j,i) = real(circ_std(goodVals*2*pi)); % circ_std can give a complex number out if all values are the same
+        else
+            meanList(j,i) = mean(goodVals);
+            stdList(j,i) = std(goodVals);
         end
     end
 end
@@ -120,47 +114,24 @@ for j = 1:3
     foo = abs(meanList(j, :) - meanList(j, 1));
     if j == 1 % Dealing with hues in radians
         foo(foo > pi) = 2*pi - foo(foo > pi); % Ensures that reflex (>180 degree) angles are replaced with their smaller counterpart. E.g., if two vectors are separated by 270deg, it is more appropriate to say they are separated by 90deg.
-        if ~isempty(min(find(foo > selectOptions.meanThr(j)*2*pi)))
-            rList = [rList, min(find(foo > selectOptions.meanThr(j)*2*pi)) - 1];
-        else
-            rList = [rList, numStimuli]; % If all values are sub-threshold, the maximum possible radius is chosen
-        end
-        if ~isempty(min(find(stdList(j, :) > selectOptions.stdThr(j)*2*pi)))
-            rList = [rList, min(find(stdList(j, :) > selectOptions.stdThr(j)*2*pi)) - 1];
-        else
-            rList = [rList, numStimuli];
-        end
+        foo = foo/(2*pi); % bring it back to 0-1 for this computation
+    end
+    if ~isempty(find(foo > selectOptions.meanThr(j), 1 ))
+        rList = cat(2,rList, find(foo > selectOptions.meanThr(j), 1 ));
     else
-        if ~isempty(min(find(foo > selectOptions.meanThr(j))))
-            rList = [rList, min(find(foo > selectOptions.meanThr(j))) - 1];
-        else
-            rList = [rList, numStimuli];
-        end
-        if ~isempty(min(find(stdList(j, :) > selectOptions.stdThr(j))))
-            rList = [rList, min(find(stdList(j, :) > selectOptions.stdThr(j))) - 1];
-        else
-            rList = [rList, numStimuli];
-        end
+        rList = cat(2,rList, numStimuli);
+    end
+    if ~isempty(find(stdList(j, :) > selectOptions.stdThr(j), 1 ))
+        rList = cat(2,rList, find(stdList(j, :) > selectOptions.stdThr(j), 1 ));
+    else
+        rList = cat(2,rList, numStimuli);
     end
 end
 rIdx = min(rList); % The index of the maximum approximation radius which doesn't deviate beyond threshold
 
-% Aperture of best-fit patch:
-if rIdx == 0
-    disp('Warning: Bad Patch, proceeding with minimum approximation...')
-    rIdx = 1;
-    %error("r = 0, no suitable patch approx. possible. Consider increasing stdThr."); % While computing r for meanList, it is impossible to go below 1. This is because deviation is considered w.r.t. to the 1st value, and can only exceed the threshold as early as r = 2. For std, as early as r = 1 we can go above stdThr.
-    %{
-    stimParams.radiusDeg = NaN;
-    stimParams.hueDeg = NaN;
-    stimParams.saturation = NaN;
-    stimParams.value = NaN;
-    %}
-else
-    gaborStim.radiusDeg = radiusMatrixDeg(rIdx);
-    [~, aperture] = makeGaborStimulus(gaborStim, xAxisDeg, yAxisDeg);
-end   
-
+gaborStim.radiusDeg = radiusMatrixDeg(rIdx);
+[~, aperture] = makeGaborStimulus(gaborStim, xAxisDeg, yAxisDeg);
+   
 % Isolating HSV channel values (0-1 range) within aperture
 H = squeeze(imageHSV(:, :, 1));
 H = H(aperture == 1);
@@ -188,61 +159,68 @@ v = mean(V);
 stimParams.radiusDeg = radiusMatrixDeg(rIdx);
 stimParams.hueDeg = h*360;
 stimParams.sat = s;
-stimParams.contrastPC = v*100;
+
+% Conversion from value (v) to contrastPC
+% Since we are approximating a patch by gabor stimulus, contrastPC=0 means
+% value of 0.5. Higher values can be achieved by increasing the contrast
+% and making the spatial phase = 90 degrees. Importantly, to get values lower than
+% 0.5, contrastPC still needs to be increased, but now spatial phase will
+% be -90 degrees. val of 0 corresponds to contrastPC=100 and phi = -90
+% degrees, while val of 1 corresponds to contrastPC=100 and phi = +90
+stimParams.contrastPC = 2*abs(v-0.5)*100;
+stimParams.spatialFreqPhaseDeg = 90*sign(v-0.5);
 
 if displayAnalysisFlag
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Display I %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    figure
-    sgtitle("Image HSV Channels")
+    figure;
+    sgtitle("Image HSV Channels");
     % Image:
-    subplot(2, 2, 1)
+    subplot(2, 2, 1);
         % Steps necessary to keep the image upright and with an ascending Y axis: (REFER https://in.mathworks.com/matlabcentral/answers/94170-how-can-i-reverse-the-y-axis-when-i-use-the-image-or-imagesc-function-to-display-an-image-in-matlab)
-        imshow(flipud(hsv2rgb(imageHSV)), 'XData', xAxisDeg, 'YData', yAxisDeg)
-        set(gca,'YDir', 'normal')
-        axis on
-        title("RGB Image")
-        xlabel("Azimuth (deg)")
-        ylabel("Elevation (deg)")
+        imshow(hsv2rgb(imageHSV), 'XData', xAxisDeg, 'YData', yAxisDeg);
+        set(gca,'YDir', 'normal');
+        axis on;
+        title("RGB Image");
+        xlabel("Azimuth (deg)");
+        ylabel("Elevation (deg)");
     % Hue Channel:
-    subplot(2, 2, 2)
-        imshow(flipud(imageHSV(:, :, 1)), 'XData', xAxisDeg, 'YData', yAxisDeg)
-        set(gca,'YDir', 'normal')
-        axis on
-        colormap('hsv')
-        caxis([0, 1])
-        colormap('hsv')
-        colorbar
-        title("Hue")
-        xlabel("Azimuth (deg)")
-        ylabel("Elevation (deg)")
+    subplot(2, 2, 2);
+        imshow(imageHSV(:, :, 1), 'XData', xAxisDeg, 'YData', yAxisDeg);
+        set(gca,'YDir', 'normal');
+        axis on;
+        caxis([0, 1]);
+        colormap('hsv');
+        colorbar;
+        title("Hue");
+        xlabel("Azimuth (deg)");
+        ylabel("Elevation (deg)");
     % Saturation Channel:
-    subplot(2, 2, 3)
-        imshow(flipud(imageHSV(:, :, 2)), 'XData', xAxisDeg, 'YData', yAxisDeg)
-        set(gca,'YDir', 'normal')
-        axis on
-        caxis([0, 1])
-        % colormap('gray') % Default
-        colorbar
-        title("Saturation")
-        xlabel("Azimuth (deg)")
-        ylabel("Elevation (deg)")
+    subplot(2, 2, 3);
+        imshow(imageHSV(:, :, 2), 'XData', xAxisDeg, 'YData', yAxisDeg);
+        set(gca,'YDir', 'normal');
+        axis on;
+        caxis([0, 1]);
+        colorbar;
+        title("Saturation");
+        xlabel("Azimuth (deg)");
+        ylabel("Elevation (deg)");
     % Value Channel
-    subplot(2, 2, 4)
-        imshow(flipud(imageHSV(:, :, 3)), 'XData', xAxisDeg, 'YData', yAxisDeg)
-        set(gca,'YDir', 'normal')
-        axis on
-        caxis([0, 1])
-        colorbar
-        title("Value/Brightness")
-        xlabel("Azimuth (deg)")
-        ylabel("Elevation (deg)")
+    subplot(2, 2, 4);
+        imshow(imageHSV(:, :, 3), 'XData', xAxisDeg, 'YData', yAxisDeg);
+        set(gca,'YDir', 'normal');
+        axis on;
+        caxis([0, 1]);
+        colorbar;
+        title("Value/Brightness");
+        xlabel("Azimuth (deg)");
+        ylabel("Elevation (deg)");
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Display II %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     figure
     sgtitle("Image Grating/Patch Approximation")
     % Image:
     subplot(2, 2, 1)
-        imshow(flipud(hsv2rgb(imageHSV)), 'XData', xAxisDeg, 'YData', yAxisDeg)
+        imshow(hsv2rgb(imageHSV), 'XData', xAxisDeg, 'YData', yAxisDeg)
         set(gca,'YDir', 'normal')
         title(sprintf("Patch Approx. (H = %0.2g deg, S = %0.2g, V = %0.2g)", h*360, s, v))
         xlabel("Azimuth (deg)")
@@ -255,27 +233,27 @@ if displayAnalysisFlag
         chan3 = imageHSV(:, :, 3);
         chan3(aperture == 1) = v;
         patchApprox = hsv2rgb(cat(3, chan1, chan2, chan3));
-        hold on
-        imshow(flipud(patchApprox), 'XData', xAxisDeg, 'YData', yAxisDeg)
+        hold on;
+        imshow(patchApprox, 'XData', xAxisDeg, 'YData', yAxisDeg)
         set(gca,'YDir', 'normal')
         alpha(0.7)
-        % Showing concentric circles for all radii:
-        params(1) = rfCenterDeg(1);
-        params(2) = rfCenterDeg(2);
-        params(5) = 0;
-        params(6) = 1;
-        for i = 1:numStimuli
-            params(3) = radiusMatrixDeg(i);
-            params(4) = params(3);
-            [~, ~, boundaryX, boundaryY] = gauss2D(params, xAxisDeg, yAxisDeg, []);
-            if i == rIdx
-                plot(boundaryX, boundaryY, '-g', 'DisplayName', sprintf("r = %0.2g", radiusMatrixDeg(rIdx))) % Highlight the patch radius
-            else
-                plot(boundaryX, boundaryY, '-k', 'HandleVisibility', 'off')
-            end
-        end
+%         % Showing concentric circles for all radii:
+%         params(1) = rfCenterDeg(1);
+%         params(2) = rfCenterDeg(2);
+%         params(5) = 0;
+%         params(6) = 1;
+%         for i = 1:numStimuli
+%             params(3) = radiusMatrixDeg(i);
+%             params(4) = params(3);
+%             [~, ~, boundaryX, boundaryY] = gauss2D(params, xAxisDeg, yAxisDeg, []);
+%             if i == rIdx
+%                 plot(boundaryX, boundaryY, '-g', 'DisplayName', sprintf("r = %0.2g", radiusMatrixDeg(rIdx))) % Highlight the patch radius
+%             else
+%                 plot(boundaryX, boundaryY, '-k', 'HandleVisibility', 'off')
+%             end
+%         end
         axis on
-        legend
+%        legend
    subplot(2, 2, 2)
         polarplot(meanList(1, :), radiusMatrixDeg, 'DisplayName', 'Mean')
         hold on
@@ -306,10 +284,10 @@ if displayAnalysisFlag
         if (meanList(2, 1) - selectOptions.meanThr(2)) >= 0     
             yline(meanList(2, 1) - selectOptions.meanThr(2), '--g',  'HandleVisibility', 'off') % Lower Bound
         else
-            yline(0, '--g', 'HandleVisibility', 'off') 
+            yline(0, '--g', 'HandleVisibility', 'off')
         end
         plot(radiusMatrixDeg, stdList(2, :), 'DisplayName', 'Std')
-        yline(selectOptions.stdThr(2), '--r', 'HandleVisibility', 'off') 
+        yline(selectOptions.stdThr(2), '--r', 'HandleVisibility', 'off')
         title("Saturation")
         legend
         xticks(radiusMatrixDeg)
@@ -327,10 +305,10 @@ if displayAnalysisFlag
         if (meanList(3, 1) - selectOptions.meanThr(3)) >= 0     
             yline(meanList(3, 1) - selectOptions.meanThr(3), '--g',  'HandleVisibility', 'off') % Lower Bound
         else
-            yline(0, '--g', 'HandleVisibility', 'off') 
+            yline(0, '--g', 'HandleVisibility', 'off')
         end
         plot(radiusMatrixDeg, stdList(3, :), 'DisplayName', 'Std')
-        yline(selectOptions.stdThr(3), '--r', 'HandleVisibility', 'off') 
+        yline(selectOptions.stdThr(3), '--r', 'HandleVisibility', 'off')
         legend
         title("Value/Brightness")
         xticks(radiusMatrixDeg)
