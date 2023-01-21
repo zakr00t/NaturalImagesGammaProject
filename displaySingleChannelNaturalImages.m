@@ -13,9 +13,10 @@
 % Run this function as:
 % displaySingleChannelNaturalImages('alpaH','240817','GRF_002')
 
-function displaySingleChannelNaturalImages(subjectName,expDate,protocolName,selectOptions,folderSourceString,gridType,gridLayout,badTrialNameStr,useCommonBadTrialsFlag)
+function displaySingleChannelNaturalImages(subjectName,expDate,protocolName,selectOptions,radiusMatrixDeg,folderSourceString,gridType,gridLayout,badTrialNameStr,useCommonBadTrialsFlag)
 
 if ~exist('selectOptions','var');       selectOptions=[];               end
+if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg=[];             end
 if ~exist('folderSourceString','var');  folderSourceString='';          end
 if ~exist('gridType','var');            gridType='Microelectrode';      end
 if ~exist('gridLayout','var');          gridLayout=2;                   end
@@ -404,7 +405,7 @@ hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.125]);
         end
         
         %%%%%%%%%%% Plot the images and their predictions %%%%%%%%%%%%%%%%%
-        allStimParams = plotImageData(hImagesPlot,hImagePatchesPlot,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,plotColor,selectOptions);
+        allStimParams = plotImageData(hImagesPlot,hImagePatchesPlot,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,plotColor,selectOptions,radiusMatrixDeg);
         allPower = squeeze(powerST(:,electrodeListPower==channelNumber,fValsToUse)); % Actual power
         [correlationsFull, correlationsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower);
         
@@ -893,8 +894,14 @@ end
 end
 %%%%%%%%%%%%c%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Display Images
-function allStimParams = plotImageData(hImagesPlot,hImagePatches,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,colorName,selectOptions)
+function allStimParams = plotImageData(hImagesPlot,hImagePatches,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,colorName,selectOptions,radiusMatrixDeg)
 patchSizeDeg=2;
+if isempty(radiusMatrixDeg)
+    radiusMatrixDeg = 0.3:0.3:patchSizeDeg;
+else
+    patchSizeDeg = max(patchSizeDeg,max(radiusMatrixDeg));
+end
+
 plottingDetails.displayPlotsFlag=1;
 
 % Setting up standard gaborStimulus which is a patch (spatial frequency of
@@ -914,7 +921,7 @@ for i=1:numImages
     plottingDetails.colorNames=colorName;
     [patchData,imageAxesDeg] = getImagePatches(imageFileName,channelNumber,subjectName,'',patchSizeDeg,plottingDetails);
     
-    stimParams = getSingleImageParameters(rgb2hsv(patchData{1}),imageAxesDeg,[0 0],(0.3:0.3:patchSizeDeg),selectOptions,0);
+    stimParams = getSingleImageParameters(rgb2hsv(patchData{1}),imageAxesDeg,[0 0],radiusMatrixDeg,selectOptions,0);
 
     allStimParams{i} = stimParams;
     

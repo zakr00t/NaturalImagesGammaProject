@@ -1,6 +1,14 @@
-function [correlationsFull,correlationsSelected,numSelectedImages,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,selectOptions,folderSourceString)
+function [correlationsFull,correlationsSelected,numSelectedImages,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,selectOptions,radiusMatrixDeg,folderSourceString)
+
+if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg=[];             end
 
 patchSizeDeg = 2;
+if isempty(radiusMatrixDeg)
+    radiusMatrixDeg = 0.3:0.3:patchSizeDeg;
+else
+    patchSizeDeg = max(patchSizeDeg,max(radiusMatrixDeg));
+end
+
 plottingDetails.displayPlotsFlag=0;
     
 if ~exist('folderSourceString','var');  folderSourceString = '';        end
@@ -26,7 +34,7 @@ for i=1:numImages
     
     % Get Stim Parameters
     for j=1:numElectrodes
-        stimParams = getSingleImageParameters(rgb2hsv(patchData{j}),imageAxesDeg,[0 0],(0.3:0.3:patchSizeDeg),selectOptions,0);
+        stimParams = getSingleImageParameters(rgb2hsv(patchData{j}),imageAxesDeg,[0 0],radiusMatrixDeg,selectOptions,0);
         allStimParams{j,i} = stimParams;
     end
 end
