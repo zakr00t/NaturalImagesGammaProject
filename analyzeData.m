@@ -1,5 +1,6 @@
-function [correlationsFull,correlationsSelected,numSelectedImages,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,selectOptions,radiusMatrixDeg,folderSourceString)
+function [correlationsFull,correlationsSelected,numSelectedImages,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,powerOption,selectOptions,radiusMatrixDeg,folderSourceString)
 
+if ~exist('powerOption','var');         powerOption=3;                  end
 if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg=[];             end
 
 patchSizeDeg = 2;
@@ -19,8 +20,17 @@ end
 rawImageFolder = fullfile(folderSourceString,'data','images',imageFolderName);
 
 % 1. Get actual gamma power
-[powerST,~,electrodeList] = getMeanEnergy(subjectName,expDate,protocolName);
-powerST = squeeze(powerST(:,:,imageIndices));
+[powerST,powerBL,electrodeList] = getMeanEnergy(subjectName,expDate,protocolName);
+if powerOption==1
+    powerST = squeeze(powerST(:,:,imageIndices)); % Only take stimulus power
+elseif powerOption==2
+    powerST = squeeze(powerST(:,:,imageIndices)) ./ squeeze(powerBL(:,:,imageIndices)); % Ratio between ST and BL
+elseif powerOption==3
+    [powerST2,powerBL2,electrodeList] = getMeanEnergy(subjectName,expDate,protocolName,'',{[80 150]}); % Take power between 80 to 150 Hz
+    powerST = squeeze(powerST(:,:,imageIndices)) ./ squeeze(powerBL(:,:,imageIndices)); % Ratio between ST and BL
+    powerST2 = squeeze(powerST2(:,:,imageIndices)) ./ squeeze(powerBL2(:,:,imageIndices)); % Ratio between ST and BL in high gamma
+    powerST = powerST - powerST2;
+end
 
 % 2. Get stimulus parameters for image patches
 disp('Getting stim params...');
