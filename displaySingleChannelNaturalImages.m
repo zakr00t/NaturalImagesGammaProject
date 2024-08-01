@@ -13,12 +13,13 @@
 % Run this function as:
 % displaySingleChannelNaturalImages('alpaH','240817','GRF_002')
 
-function displaySingleChannelNaturalImages(subjectName,expDate,protocolName,powerOption,selectOptions,radiusMatrixDeg,folderSourceString,gridType,gridLayout,badTrialNameStr,useCommonBadTrialsFlag)
+function displaySingleChannelNaturalImages(subjectName,expDate,protocolName,powerOption,selectOptions,radiusMatrixDeg,folderSourceString,versionFlag,predType,gridType,gridLayout,badTrialNameStr,useCommonBadTrialsFlag)
 
 if ~exist('powerOption','var');         powerOption=3;                  end
 if ~exist('selectOptions','var');       selectOptions=[];               end
 if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg=[];             end
 if ~exist('folderSourceString','var');  folderSourceString='';          end
+if ~exist('versionFlag','var');         versionFlag=0;                  end
 if ~exist('gridType','var');            gridType='Microelectrode';      end
 if ~exist('gridLayout','var');          gridLayout=2;                   end
 if ~exist('badTrialNameStr','var');     badTrialNameStr = '';           end
@@ -33,7 +34,13 @@ end
 if isempty(folderSourceString)
     folderSourceString = fileparts(pwd);
 end
-    
+if versionFlag && ~exist('predType','var')
+    predType = "mismatchL2"; % More options for computing predictability (P) to be incorporated in the near future
+    P = str2func(predType);
+elseif versionFlag
+    P = str2func(predType);
+end
+
 folderName = fullfile(folderSourceString,'data',subjectName,gridType,expDate,protocolName);
 
 % Get folders
@@ -68,7 +75,7 @@ else
     set2Name = experimentalDetails{3};
     imageFolderName = experimentalDetails{4};
 end
-rawImageFolder = fullfile(folderSourceString,'data','images',imageFolderName);
+rawImageFolder = fullfile(fileparts(pwd), 'data', 'images', imageFolderName);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%% Plot Electrode Array %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -359,9 +366,15 @@ end
 
 
 
-hPowerPredictionPlot = subplot('Position',[0.825 0.45 0.15 0.25]);
-hCorrelationPlotFull = subplot('Position',[0.825 0.225 0.15 0.125]);
-hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.125]);
+if ~versionFlag
+    hPowerPredictionPlot = subplot('Position',[0.825 0.45 0.15 0.25]);
+    hCorrelationPlotFull = subplot('Position',[0.825 0.225 0.15 0.125]);
+    hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.125]);
+else
+    hPowerPredictionPlot = subplot('Position',[0.825 0.485 0.15 0.215]);
+    hPowerPredictionPlot2 = subplot('Position',[0.825 0.205 0.15 0.215]);
+    hCorrelationPlotFull = subplot('Position',[0.825 0.05 0.15 0.1]);
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -421,33 +434,69 @@ hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.125]);
         %%%%%%%%%%% Plot the images and their predictions %%%%%%%%%%%%%%%%%
         allStimParams = plotImageData(hImagesPlot,hImagePatchesPlot,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,plotColor,selectOptions,radiusMatrixDeg);
         allPower = squeeze(powerST(:,electrodeListPower==channelNumber,fValsToUse)); % Actual power
-        [correlationsFull, correlationsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower);
-        
+        if ~versionFlag
+            [correlationsFull, correlationsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower);
+        else
+            [correlationsFull, ~, predictionString, predictedPower, ~] = getAllCorrelations(subjectName,allStimParams,allPower);
+            disp("Computing Predictability (P) Measure...")
+            predictedPower2 = P(allStimParams, rawImageFolder, fValsToUse, rfData, analogChannels, analogChannelPos);
+            c = [ones(length(predictedPower), 1), predictedPower']\allPower; % Offset (c0) and gain (c1) coefficients vector
+            c_ = [ones(length(predictedPower2), 1), predictedPower2]\allPower; % Same as above, but for our OUT - IN measure
+        end
+
         numStimuli = length(allStimParams);
         colorNamesPower = jet(numStimuli);
         cla(hPowerPredictionPlot);
         hold(hPowerPredictionPlot,'on');
-        for i=1:numStimuli
-            title(hImagesPlot(i),num2str(i),'color',colorNamesPower(i,:));
-            if isempty(intersect(i,selectedImageIndices)) % Not a selected image
-                plot(hPowerPredictionPlot,allPower(i),predictedPower(i),'marker','o','color',colorNamesPower(i,:));
-            else
-                plot(hPowerPredictionPlot,allPower(i),predictedPower(i),'marker','o','color',colorNamesPower(i,:),'markerfacecolor',colorNamesPower(i,:));
+        if ~versionFlag
+            for i=1:numStimuli
+                title(hImagesPlot(i),num2str(i),'color',colorNamesPower(i,:));
+                if isempty(intersect(i,selectedImageIndices)) % Not a selected image
+                    plot(hPowerPredictionPlot,allPower(i),predictedPower(i),'marker','o','color',colorNamesPower(i,:));
+                else
+                    plot(hPowerPredictionPlot,allPower(i),predictedPower(i),'marker','o','color',colorNamesPower(i,:),'markerfacecolor',colorNamesPower(i,:));
+                end
+                text(allPower(i),predictedPower(i)+0.001,num2str(i),'parent',hPowerPredictionPlot);
             end
-            text(allPower(i),predictedPower(i)+0.001,num2str(i),'parent',hPowerPredictionPlot);
+            title(hPowerPredictionPlot,['rFull: ' num2str(round(correlationsFull(6),2)) ', rSel(N=' num2str(length(selectedImageIndices)) '):' num2str(round(correlationsSelected(6),2))]);
+            xlabel(hPowerPredictionPlot,'Actual Gamma'); ylabel(hPowerPredictionPlot,'Predicted Gamma'); 
+            
+            bar(correlationsFull,'Parent',hCorrelationPlotFull);
+            set(hCorrelationPlotFull,'XTickLabel',[]);
+            title(hCorrelationPlotFull,'Full set');
+            ylim(hCorrelationPlotFull,[-1 1]);
+            
+            bar(correlationsSelected,'Parent',hCorrelationPlotSelected);
+            set(hCorrelationPlotSelected,'XTickLabel',predictionString);
+            title(hCorrelationPlotSelected,'Selected set');
+            ylim(hCorrelationPlotSelected,[-1 1]);
+        else
+            for i=1:numStimuli
+                title(hImagesPlot(i),num2str(i),'color',colorNamesPower(i,:));
+                plot(hPowerPredictionPlot,allPower(i),c(2)*predictedPower(i) + c(1),'ok','markerfacecolor',colorNamesPower(i,:),'MarkerSize',10);
+                text(allPower(i),c(2)*predictedPower(i) + c(1),num2str(i),'parent',hPowerPredictionPlot,'FontSize',6);
+            end
+            plot(hPowerPredictionPlot, [0, max(max(allPower), max(predictedPower))], [0, max(max(allPower), max(predictedPower))], '--k')
+            title(hPowerPredictionPlot,['rFull: ' num2str(round(correlationsFull(5),2))]);
+            xlabel(hPowerPredictionPlot,'Actual Gamma'); ylabel(hPowerPredictionPlot,'Predicted Gamma'); 
+        
+            cla(hPowerPredictionPlot2);
+            hold(hPowerPredictionPlot2,'on');
+            for i=1:numStimuli
+                plot(hPowerPredictionPlot2,allPower(i),c_(2)*predictedPower2(i) + c_(1),'ok','markerfacecolor',colorNamesPower(i,:),'MarkerSize',10);
+                text(allPower(i),c_(2)*predictedPower2(i) + c_(1),num2str(i),'parent',hPowerPredictionPlot2,'FontSize',6);
+            end
+            plot(hPowerPredictionPlot2, [0, max(max(allPower), max(predictedPower2))], [0, max(max(allPower), max(predictedPower2))], '--k')
+            title(hPowerPredictionPlot2,['r: ' num2str(round(corr(allPower, predictedPower2),2))]);
+            xlabel(hPowerPredictionPlot2,'Actual Gamma'); ylabel(hPowerPredictionPlot2,'Predicted Gamma'); 
+  
+            correlationsFull(end) = corr(allPower, predictedPower2);
+            predictionString{end} = 'P';
+            bar(correlationsFull,'Parent',hCorrelationPlotFull);
+            set(hCorrelationPlotFull,'XTickLabel',predictionString);
+            title(hCorrelationPlotFull,'Full set');
+            ylim(hCorrelationPlotFull,[-1 1]);
         end
-        title(hPowerPredictionPlot,['rFull: ' num2str(round(correlationsFull(6),2)) ', rSel(N=' num2str(length(selectedImageIndices)) '):' num2str(round(correlationsSelected(6),2))]);
-        xlabel(hPowerPredictionPlot,'Actual Gamma'); ylabel(hPowerPredictionPlot,'Predicted Gamma'); 
-        
-        bar(correlationsFull,'Parent',hCorrelationPlotFull);
-        set(hCorrelationPlotFull,'XTickLabel',[]);
-        title(hCorrelationPlotFull,'Full set');
-        ylim(hCorrelationPlotFull,[-1 1]);
-        
-        bar(correlationsSelected,'Parent',hCorrelationPlotSelected);
-        set(hCorrelationPlotSelected,'XTickLabel',predictionString);
-        title(hCorrelationPlotSelected,'Selected set');
-        ylim(hCorrelationPlotSelected,[-1 1]);
     end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     function rescaleZ_Callback(~,~)
@@ -531,8 +580,12 @@ hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.125]);
    
         cla(hPowerPredictionPlot);
         cla(hCorrelationPlotFull);
-        cla(hCorrelationPlotSelected);
-        
+        if ~versionFlag
+            cla(hCorrelationPlotSelected);
+        else
+            cla(hPowerPredictionPlot2);
+        end
+
         function claGivenPlotHandle(plotHandles)
             [numRows,numCols] = size(plotHandles);
             for i=1:numRows
@@ -600,7 +653,7 @@ params.trialave = 1; %averaging across trials
 
 if analysisType == 9 % deltaTF
     clear goodPos
-    goodPos = parameterCombinations{1,1,1,2*numPlots+1};
+    goodPos = parameterCombinations{1,1,1,end};;
     goodPos = setdiff(goodPos,badTrials);
     
     [S,timeTF] = mtspecgramc(analogData(goodPos,:)',movingwin,params);
@@ -671,6 +724,9 @@ for i=1:numPlots
             
             if analysisType == 7
                 plot(plotHandles(i),xs,10*(log10(fftERPST)-log10(fftERPBL)),'color',plotColor);
+                hold(plotHandles(i),'on');
+                plot(plotHandles(i),xs,zeros(1,length(xs)),'color','k');
+                hold(plotHandles(i),'off');
             end
             
         elseif analysisType == 8 || analysisType == 9  % TF analysis
