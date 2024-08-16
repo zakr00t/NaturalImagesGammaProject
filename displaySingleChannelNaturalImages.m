@@ -439,13 +439,16 @@ end
         else
             [correlationsFull, ~, predictionString, predictedPower, ~] = getAllCorrelations(subjectName,allStimParams,allPower);
             disp("Computing Predictability (P) Measure...")
-            predictedPower2 = P(allStimParams, rawImageFolder, fValsToUse, rfData, analogChannels, analogChannelPos);
-            c = [ones(length(predictedPower), 1), predictedPower']\allPower; % Offset (c0) and gain (c1) coefficients vector
-            c_ = [ones(length(predictedPower2), 1), predictedPower2]\allPower; % Same as above, but for our OUT - IN measure
+            predictedPower2 = P(allStimParams, rawImageFolder, fValsToUse, rfData, analogChannelPos);
+            rng("default") % Reset RNG before running crossValidate for reproducible results
+            predictedPower2 = crossValidate([ones(length(predictedPower2), 1), predictedPower2], allPower, 4); % 4-fold CV applied, ensures our linear regression model is not overfitting on P
+            C = [ones(length(predictedPower), 1), predictedPower']\allPower; % Offset (c0) and gain (c1) coefficients vector
+            C_ = [ones(length(predictedPower2), 1), predictedPower2]\allPower; % Same as above, but for our P measure
+            C__ = [ones(length(predictedPower), 1), predictedPower', predictedPower2]\allPower; % Same as above, but for HSV combined with P
         end
 
         numStimuli = length(allStimParams);
-        colorNamesPower = jet(numStimuli);
+        colorNamesPower = turbo(numStimuli);
         cla(hPowerPredictionPlot);
         hold(hPowerPredictionPlot,'on');
         if ~versionFlag
@@ -473,25 +476,27 @@ end
         else
             for i=1:numStimuli
                 title(hImagesPlot(i),num2str(i),'color',colorNamesPower(i,:));
-                plot(hPowerPredictionPlot,allPower(i),c(2)*predictedPower(i) + c(1),'ok','markerfacecolor',colorNamesPower(i,:),'MarkerSize',10);
-                text(allPower(i),c(2)*predictedPower(i) + c(1),num2str(i),'parent',hPowerPredictionPlot,'FontSize',6);
+                plot(hPowerPredictionPlot,allPower(i),C(2)*predictedPower(i) + C(1),'ok','markerfacecolor',colorNamesPower(i,:),'MarkerSize',10);
+                text(allPower(i),C(2)*predictedPower(i) + C(1),num2str(i),'parent',hPowerPredictionPlot,'FontSize',6);
             end
-            plot(hPowerPredictionPlot, [0, max(max(allPower), max(predictedPower))], [0, max(max(allPower), max(predictedPower))], '--k')
-            title(hPowerPredictionPlot,['rFull: ' num2str(round(correlationsFull(5),2))]);
+            plot(hPowerPredictionPlot, [0, max(max(allPower), max(C(2)*predictedPower + C(1)))], [0, max(max(allPower), max(C(2)*predictedPower + C(1)))], '--k')
+            title(hPowerPredictionPlot,['HSV r: ' num2str(round(correlationsFull(5),2))]);
             xlabel(hPowerPredictionPlot,'Actual Gamma'); ylabel(hPowerPredictionPlot,'Predicted Gamma'); 
         
             cla(hPowerPredictionPlot2);
             hold(hPowerPredictionPlot2,'on');
             for i=1:numStimuli
-                plot(hPowerPredictionPlot2,allPower(i),c_(2)*predictedPower2(i) + c_(1),'ok','markerfacecolor',colorNamesPower(i,:),'MarkerSize',10);
-                text(allPower(i),c_(2)*predictedPower2(i) + c_(1),num2str(i),'parent',hPowerPredictionPlot2,'FontSize',6);
+                plot(hPowerPredictionPlot2, allPower(i), (C__(1) + C__(2)*predictedPower(i) + C__(3)*predictedPower2(i)), 'ok', 'markerfacecolor', colorNamesPower(i, :), 'MarkerSize', 10);
+                text(allPower(i), (C__(1) + C__(2)*predictedPower(i) + C__(3)*predictedPower2(i)), num2str(i), 'parent', hPowerPredictionPlot2, 'FontSize', 6);
             end
-            plot(hPowerPredictionPlot2, [0, max(max(allPower), max(predictedPower2))], [0, max(max(allPower), max(predictedPower2))], '--k')
-            title(hPowerPredictionPlot2,['r: ' num2str(round(corr(allPower, predictedPower2),2))]);
+            plot(hPowerPredictionPlot2, [0, max(max(allPower), max(C__(1) + C__(2)*predictedPower(i) + C__(3)*predictedPower2(i)))], [0, max(max(allPower), max(C__(1) + C__(2)*predictedPower(i) + C__(3)*predictedPower2(i)))], '--k')
+            title(hPowerPredictionPlot2,['HSV+P r: ' num2str(round(corr(allPower, [ones(length(predictedPower), 1), predictedPower', predictedPower2]*C__),2))]);
             xlabel(hPowerPredictionPlot2,'Actual Gamma'); ylabel(hPowerPredictionPlot2,'Predicted Gamma'); 
   
-            correlationsFull(end) = corr(allPower, predictedPower2);
-            predictionString{end} = 'P';
+            predictionString{end} = 'P'; % Overwriting the redundant HSVR with P
+            correlationsFull(end) = corr(allPower, predictedPower2); 
+            predictionString = [predictionString, 'HSV+P']; % Adding HSV+P
+            correlationsFull = [correlationsFull, corr(allPower, [ones(length(predictedPower), 1), predictedPower', predictedPower2]*C__)]; 
             bar(correlationsFull,'Parent',hCorrelationPlotFull);
             set(hCorrelationPlotFull,'XTickLabel',predictionString);
             title(hCorrelationPlotFull,'Full set');
@@ -730,7 +735,7 @@ for i=1:numPlots
             end
             
         elseif analysisType == 8 || analysisType == 9  % TF analysis
-            colormap jet;
+            colormap turbo;
             [S,timeTF,freqTF] = mtspecgramc(analogData(goodPos,:)',movingwin,params);
             xValToPlot = timeTF+timeVals(1)-1/Fs;
             if (analysisType==8)
