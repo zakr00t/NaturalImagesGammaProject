@@ -2,9 +2,10 @@ versionFlag = 1; % 0 = HSVR, 1 = HSV+P (fixed R)
 patchSizeDeg = 2;
 radiusMatrixDeg = 1;
 powerOption = 3; % 1 - ST power, 2 - ST/BL ratio, 3 - ST/BL ratio minus ST/BL ratio in HG
+folderSourceString = "E:";
 
 [experimentalDetails,matchIndex] = getExperimentalDetails;
-posList = 5; % [1, 2, 5]; % [10, 13, 14] % Index for which data needs to be saved
+posList =  [1, 2, 5]; % [1, 2, 5]; % [3, 4, 6]; % [10, 13, 14] % [12, 15, 16]; % Index for which data needs to be saved
 
 correlationsFull = [];
 correlationsSelected = [];
@@ -29,7 +30,7 @@ for i=1:length(posList)
         
         if ~isempty(dataType)
             disp(['Working on ' subjectName expDate protocolName ', set: ' dataType]);
-            [cFull,predictionString,cSelected,numSI] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,versionFlag,patchSizeDeg,radiusMatrixDeg,[],powerOption);
+            [cFull,predictionString,cSelected,numSI] = analyzeData(subjectName,expDate,protocolName,folderSourceString,imageFolderName,imageIndices,versionFlag,patchSizeDeg,radiusMatrixDeg);
             correlationsFull = cat(2,correlationsFull,cFull);
             correlationsSelected = cat(2,correlationsSelected,cSelected);
             numSelectedImages = cat(2,numSelectedImages,numSI);

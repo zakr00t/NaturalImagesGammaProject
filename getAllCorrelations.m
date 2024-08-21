@@ -17,12 +17,14 @@
 % 2. selected images for which predition is deemed non-trivial (r>rCutoff)
 % (correlationValsSelected)
 
-function [correlationValsFull, correlationValsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower,rCutoff,versionFlag,elecIdx,RFdata,rawImageFolder,imageIndices)
+function [correlationValsFull, correlationValsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower,rCutoff,versionFlag,elecIdx,RFdata,rawImageFolder,imageIndices,savedDataFile)
 
     if ~exist('rCutoff','var');      rCutoff = 0.3;   end
     if ~exist('versionFlag','var');  versionFlag = 0; end
+    if ~exist('savedDataFile','var');  savedDataFile = []; end
     rMax = 10; % Large radius for which the gamma vs radius function saturates
-    
+    persistent P_array % Initializing array of precomputed P values, to be used only if there is no save file of the same
+
     numStimuli = length(allStimParams);
     selectedImageIndices = [];
     
@@ -98,16 +100,30 @@ function [correlationValsFull, correlationValsSelected, predictionString, predic
         [correlationValsFull(6),correlationValsSelected(6),predictedPower] = getCorrelations(subjectName,allStimParams,allPower,selectedImageIndices); % Full model
     else
         % Use P & HSV+P (full model)
-        P = mismatchL2(allStimParams, rawImageFolder, imageIndices, RFdata, elecIdx);
+        numElectrodes = length(RFdata.highRMSElectrodes);
+        if isfile(fullfile("savedData", "mismatchL2", subjectName, savedDataFile)) % When called by <analyzeData.m>, savedDataFile would either be a valid file, or a non-existent one
+            P = load(fullfile("savedData", "mismatchL2", subjectName, savedDataFile)).P_array(:, elecIdx);
+        elseif isfolder(fullfile("savedData", "mismatchL2", subjectName, savedDataFile)) % When called by <displaySCNI.m>, savedDataFile doesn't exist, and would simply result in pointing to the folder instead, no save file created
+            P = mismatchL2(allStimParams, rawImageFolder, imageIndices, RFdata, elecIdx);
+        else % Implies a call from <analyzeData.m> with a non-existent savedDataFile, proceeds to create one
+            if isempty(P_array), P_array = NaN*zeros([numStimuli, numElectrodes]); end
+            P = mismatchL2(allStimParams, rawImageFolder, imageIndices, RFdata, elecIdx);
+            P_array(:, elecIdx) = P;
+            if elecIdx == numElectrodes % On the last pass/electrode, P_array is saved to the save file
+                vars.P_array = P_array;
+                save(fullfile("savedData", "mismatchL2", subjectName, savedDataFile), "-struct", "vars")
+                P_array = []; % And reset to its original value, an empty array
+            end
+        end
         rng("default") % Reset RNG before running crossValidate for reproducible results
-        P = crossValidate([ones(length(P), 1), P], allPower', 4);  % 4-fold CV applied, ensures our linear regression model is not overfitting on P
+        P = crossValidate([ones(length(P), 1), P], allPower(:), 4); % 4-fold CV applied, ensures our linear regression model is not overfitting on P
         predictionString{6} = 'P';
-        correlationValsFull(6) = corr(allPower', P);
+        correlationValsFull(6) = corr(allPower(:), P);
         predictionString{7} = 'HSV+P';
-        X = [ones(length(P), 1), predictedPower', P];
-        C = X\allPower';
+        X = [ones(length(P), 1), predictedPower(:), P];
+        C = X\allPower(:);
         predictedPower = X*C;
-        correlationValsFull(7) = corr(allPower', predictedPower);
+        correlationValsFull(7) = corr(allPower(:), predictedPower(:));
         correlationValsSelected = [];
     end
 

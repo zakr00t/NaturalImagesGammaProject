@@ -75,7 +75,7 @@ else
     set2Name = experimentalDetails{3};
     imageFolderName = experimentalDetails{4};
 end
-rawImageFolder = fullfile(fileparts(pwd), 'data', 'images', imageFolderName);
+rawImageFolder = fullfile(folderSourceString,'data','images',imageFolderName);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%% Plot Electrode Array %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -437,14 +437,9 @@ end
         if ~versionFlag
             [correlationsFull, correlationsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower);
         else
-            [correlationsFull, ~, predictionString, predictedPower, ~] = getAllCorrelations(subjectName,allStimParams,allPower);
-            disp("Computing Predictability (P) Measure...")
-            predictedPower2 = P(allStimParams, rawImageFolder, fValsToUse, rfData, analogChannelPos);
-            rng("default") % Reset RNG before running crossValidate for reproducible results
-            predictedPower2 = crossValidate([ones(length(predictedPower2), 1), predictedPower2], allPower, 4); % 4-fold CV applied, ensures our linear regression model is not overfitting on P
-            C = [ones(length(predictedPower), 1), predictedPower']\allPower; % Offset (c0) and gain (c1) coefficients vector
-            C_ = [ones(length(predictedPower2), 1), predictedPower2]\allPower; % Same as above, but for our P measure
-            C__ = [ones(length(predictedPower), 1), predictedPower', predictedPower2]\allPower; % Same as above, but for HSV combined with P
+            [~, ~, ~, predictedPower, ~] = getAllCorrelations(subjectName,allStimParams,allPower); % This is based on HSVR, not HSV. However since versionFlag = 1 implies a fixed radius, the predicted power is the same as HSV up to a scaling factor.
+            C = [ones(length(predictedPower), 1), predictedPower']\allPower; % Offset (c0) and gain (c1) coefficients vector for predictedPower
+            [correlationsFull, ~, predictionString, predictedPower2, ~] = getAllCorrelations(subjectName, allStimParams, allPower, [], versionFlag, analogChannelPos, rfData, rawImageFolder, fValsToUse); % predictedPower2 is HSV+P model predictions with correct gain and offset applied. Refer <getAllCorrelations.m> for more details.
         end
 
         numStimuli = length(allStimParams);
@@ -486,17 +481,13 @@ end
             cla(hPowerPredictionPlot2);
             hold(hPowerPredictionPlot2,'on');
             for i=1:numStimuli
-                plot(hPowerPredictionPlot2, allPower(i), (C__(1) + C__(2)*predictedPower(i) + C__(3)*predictedPower2(i)), 'ok', 'markerfacecolor', colorNamesPower(i, :), 'MarkerSize', 10);
-                text(allPower(i), (C__(1) + C__(2)*predictedPower(i) + C__(3)*predictedPower2(i)), num2str(i), 'parent', hPowerPredictionPlot2, 'FontSize', 6);
+                plot(hPowerPredictionPlot2, allPower(i), predictedPower2(i), 'ok', 'markerfacecolor', colorNamesPower(i, :), 'MarkerSize', 10);
+                text(allPower(i), predictedPower2(i), num2str(i), 'parent', hPowerPredictionPlot2, 'FontSize', 6);
             end
-            plot(hPowerPredictionPlot2, [0, max(max(allPower), max(C__(1) + C__(2)*predictedPower(i) + C__(3)*predictedPower2(i)))], [0, max(max(allPower), max(C__(1) + C__(2)*predictedPower(i) + C__(3)*predictedPower2(i)))], '--k')
-            title(hPowerPredictionPlot2,['HSV+P r: ' num2str(round(corr(allPower, [ones(length(predictedPower), 1), predictedPower', predictedPower2]*C__),2))]);
+            plot(hPowerPredictionPlot2, [0, max(max(allPower), max(predictedPower2))], [0, max(max(allPower), max(predictedPower2))], '--k')
+            title(hPowerPredictionPlot2,['HSV+P r: ' num2str(round(corr(allPower, predictedPower2), 2))]);
             xlabel(hPowerPredictionPlot2,'Actual Gamma'); ylabel(hPowerPredictionPlot2,'Predicted Gamma'); 
   
-            predictionString{end} = 'P'; % Overwriting the redundant HSVR with P
-            correlationsFull(end) = corr(allPower, predictedPower2); 
-            predictionString = [predictionString, 'HSV+P']; % Adding HSV+P
-            correlationsFull = [correlationsFull, corr(allPower, [ones(length(predictedPower), 1), predictedPower', predictedPower2]*C__)]; 
             bar(correlationsFull,'Parent',hCorrelationPlotFull);
             set(hCorrelationPlotFull,'XTickLabel',predictionString);
             title(hCorrelationPlotFull,'Full set');

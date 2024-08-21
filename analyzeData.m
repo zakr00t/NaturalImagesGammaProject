@@ -1,7 +1,10 @@
 function [correlationsFull, predictionString, correlationsSelected, numSelectedImages] = ...
-    analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,versionFlag,patchSizeDeg,radiusMatrixDeg,selectOptions,powerOption,folderSourceString)
+    analyzeData(subjectName,expDate,protocolName,folderSourceString,imageFolderName,imageIndices,versionFlag,patchSizeDeg,radiusMatrixDeg,selectOptions,powerOption)
 
     % Input Arguments:
+    if isempty(folderSourceString)
+        folderSourceString = fileparts(pwd);
+    end
     if ~exist('versionFlag','var');         versionFlag = 0;                end
     if ~exist('patchSizeDeg','var');        patchSizeDeg = 2;               end
     if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg=[];             end
@@ -19,9 +22,7 @@ function [correlationsFull, predictionString, correlationsSelected, numSelectedI
     end
     if ~exist('powerOption','var');         powerOption=3;                  end
     if ~exist('folderSourceString','var');  folderSourceString = '';        end
-    if isempty(folderSourceString)
-        folderSourceString = fileparts(pwd);
-    end
+    
     
     gridType = 'Microelectrode';
     RFdata = load(fullfile(folderSourceString,'data','rfData',subjectName,[subjectName gridType 'RFData.mat']));
@@ -71,11 +72,20 @@ function [correlationsFull, predictionString, correlationsSelected, numSelectedI
             predictionString = ["H", "S", "V", "HS", "HSV", "HSVR"];
         end
     else
+        category = strsplit(imageFolderName, "_");
+        if isscalar(category), imageType = ""; else imageType = strcat(category(2), "_"); end
+        category = char(category(1)); category = category(7:end); category = category(all(imageIndices > numImages) + 1);
+        savedDataFile = strcat(category, "_", imageType, "r", num2str(radiusMatrixDeg), ".mat"); % Assuming fixed scalar radius
+        if isfile(fullfile("savedData", "mismatchL2", subjectName, savedDataFile))
+            disp(strcat("Loading ", fullfile("savedData", "mismatchL2", subjectName, savedDataFile)))
+        else
+            disp(strcat("No savefile found... generating ", fullfile("savedData", "mismatchL2", subjectName, savedDataFile)))
+        end
         correlationsFull = zeros(7, numElectrodes);
         for j = 1:numElectrodes
             stimParams = allStimParams(:, j);
             actualPower = powerST(j, :);
-            correlationsFull(:,j) = getAllCorrelations(subjectName, stimParams, actualPower, [], versionFlag, j, RFdata, rawImageFolder, imageIndices);
+            correlationsFull(:,j) = getAllCorrelations(subjectName, stimParams, actualPower, [], versionFlag, j, RFdata, rawImageFolder, imageIndices, savedDataFile);
         end
         predictionString = ["H", "S", "V", "HS", "HSV", "P", "HSV+P"];
         correlationsSelected = [];
