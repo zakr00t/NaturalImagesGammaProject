@@ -1,14 +1,11 @@
+versionFlag = 1; % 0 = HSVR, 1 = HSV+P (fixed R)
+patchSizeDeg = 2;
+radiusMatrixDeg = 1;
 powerOption = 3; % 1 - ST power, 2 - ST/BL ratio, 3 - ST/BL ratio minus ST/BL ratio in HG
-
-selectOptions.meanThr = [0.05 0.05 0.05];
-selectOptions.stdThr = 2*selectOptions.meanThr;
-selectOptions.measure = 'diff';
-selectOptions.method = 'vector';
-
-radiusMatrixDeg = 0.3:0.3:2;
+folderSourceString = "E:";
 
 [experimentalDetails,matchIndex] = getExperimentalDetails;
-posList = 5; % Index for which data needs to be saved
+posList =  [1, 2, 5]; % [1, 2, 5]; % [3, 4, 6]; % [10, 13, 14] % [12, 15, 16]; % Index for which data needs to be saved
 
 correlationsFull = [];
 correlationsSelected = [];
@@ -33,7 +30,7 @@ for i=1:length(posList)
         
         if ~isempty(dataType)
             disp(['Working on ' subjectName expDate protocolName ', set: ' dataType]);
-            [cFull,cSelected,numSI,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,powerOption,selectOptions,radiusMatrixDeg);
+            [cFull,predictionString,cSelected,numSI] = analyzeData(subjectName,expDate,protocolName,folderSourceString,imageFolderName,imageIndices,versionFlag,patchSizeDeg,radiusMatrixDeg);
             correlationsFull = cat(2,correlationsFull,cFull);
             correlationsSelected = cat(2,correlationsSelected,cSelected);
             numSelectedImages = cat(2,numSelectedImages,numSI);
@@ -42,9 +39,11 @@ for i=1:length(posList)
 end
 
 cutoffSelectedImages = 8;
+
 clf;
-for i=1:2
-    hPlot = subplot(1,2,i);
+nSubplots = (1 + ~versionFlag);
+for i=1:nSubplots
+    hPlot = subplot(1,nSubplots,i);
     if i==1
         X = correlationsFull;
         N = size(X,2);

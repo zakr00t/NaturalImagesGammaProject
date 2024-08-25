@@ -17,98 +17,131 @@
 % 2. selected images for which predition is deemed non-trivial (r>rCutoff)
 % (correlationValsSelected)
 
-function [correlationValsFull, correlationValsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower,rCutoff)
+function [correlationValsFull, correlationValsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower,rCutoff,versionFlag,elecIdx,RFdata,rawImageFolder,imageIndices,savedDataFile)
 
-if ~exist('rCutoff','var');         rCutoff = 0.3;                      end
-rMax = 10; % Large radius for which the gamma vs radius function saturates
+    if ~exist('rCutoff','var');      rCutoff = 0.3;   end
+    if ~exist('versionFlag','var');  versionFlag = 0; end
+    if ~exist('savedDataFile','var');  savedDataFile = []; end
+    rMax = 10; % Large radius for which the gamma vs radius function saturates
+    persistent P_array % Initializing array of precomputed P values, to be used only if there is no save file of the same
 
-numStimuli = length(allStimParams);
-selectedImageIndices = [];
-for i=1:numStimuli
-    if (allStimParams{i}.radiusDeg > rCutoff)
-        selectedImageIndices = cat(2,selectedImageIndices,i);
-    end
-end
-
-% Only use Hue
-tmpStimParams = allStimParams;
-for i=1:numStimuli
-    tmp = tmpStimParams{i};
-    tmp.sat = 1;
-    tmp.contrastPC = 100;
-    tmp.spatialFreqPhaseDeg = 90;
-    tmp.radiusDeg = rMax;
-    tmpStimParams{i} = tmp;
-end
-predictionString{1} = 'H';
-[correlationValsFull(1),correlationValsSelected(1)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
-
-% Only use Sat
-tmpStimParams = allStimParams;
-for i=1:numStimuli
-    tmp = tmpStimParams{i};
-    tmp.hueDeg = 0; % Choose red
-    tmp.contrastPC = 100;
-    tmp.spatialFreqPhaseDeg = 90;
-    tmp.radiusDeg = rMax;
-    tmpStimParams{i} = tmp;
-end
-predictionString{2} = 'S';
-[correlationValsFull(2),correlationValsSelected(2)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
-
-% Only use Val - leave both contrastPC and spatialFreqPhaseDeg unchanged
-tmpStimParams = allStimParams;
-for i=1:numStimuli
-    tmp = tmpStimParams{i};
-    tmp.hueDeg = 0; % Choose red
-    tmp.sat = 1;
-    tmp.radiusDeg = rMax;
-    tmpStimParams{i} = tmp;
-end
-predictionString{3} = 'V';
-[correlationValsFull(3),correlationValsSelected(3)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
-
-% Only Hue and Sat
-tmpStimParams = allStimParams;
-for i=1:numStimuli
-    tmp = tmpStimParams{i};
-    tmp.contrastPC = 100;
-    tmp.spatialFreqPhaseDeg = 90;
-    tmp.radiusDeg = rMax;
-    tmpStimParams{i} = tmp;
-end
-predictionString{4} = 'HS';
-[correlationValsFull(4),correlationValsSelected(4)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
-
-% Use HSV
-tmpStimParams = allStimParams;
-for i=1:numStimuli
-    tmp = tmpStimParams{i};
-    tmp.radiusDeg = rMax;
-    tmpStimParams{i} = tmp;
-end
-predictionString{5} = 'HSV';
-[correlationValsFull(5),correlationValsSelected(5)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
-
-% Use HSVR (full model)
-predictionString{6} = 'HSVR';
-[correlationValsFull(6),correlationValsSelected(6),predictedPower] = getCorrelations(subjectName,allStimParams,allPower,selectedImageIndices); % Full model
+    numStimuli = length(allStimParams);
+    selectedImageIndices = [];
     
+    for i=1:numStimuli
+        if (allStimParams{i}.radiusDeg > rCutoff)
+            selectedImageIndices = cat(2,selectedImageIndices,i);
+        end
+    end
+    
+    % Only use Hue
+    tmpStimParams = allStimParams;
+    for i=1:numStimuli
+        tmp = tmpStimParams{i};
+        tmp.sat = 1;
+        tmp.contrastPC = 100;
+        tmp.spatialFreqPhaseDeg = 90;
+        tmp.radiusDeg = rMax;
+        tmpStimParams{i} = tmp;
+    end
+    predictionString{1} = 'H';
+    [correlationValsFull(1),correlationValsSelected(1)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
+    
+    % Only use Sat
+    tmpStimParams = allStimParams;
+    for i=1:numStimuli
+        tmp = tmpStimParams{i};
+        tmp.hueDeg = 0; % Choose red
+        tmp.contrastPC = 100;
+        tmp.spatialFreqPhaseDeg = 90;
+        tmp.radiusDeg = rMax;
+        tmpStimParams{i} = tmp;
+    end
+    predictionString{2} = 'S';
+    [correlationValsFull(2),correlationValsSelected(2)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
+    
+    % Only use Val - leave both contrastPC and spatialFreqPhaseDeg unchanged
+    tmpStimParams = allStimParams;
+    for i=1:numStimuli
+        tmp = tmpStimParams{i};
+        tmp.hueDeg = 0; % Choose red
+        tmp.sat = 1;
+        tmp.radiusDeg = rMax;
+        tmpStimParams{i} = tmp;
+    end
+    predictionString{3} = 'V';
+    [correlationValsFull(3),correlationValsSelected(3)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
+    
+    % Only Hue and Sat
+    tmpStimParams = allStimParams;
+    for i=1:numStimuli
+        tmp = tmpStimParams{i};
+        tmp.contrastPC = 100;
+        tmp.spatialFreqPhaseDeg = 90;
+        tmp.radiusDeg = rMax;
+        tmpStimParams{i} = tmp;
+    end
+    predictionString{4} = 'HS';
+    [correlationValsFull(4),correlationValsSelected(4)] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
+    
+    % Use HSV
+    tmpStimParams = allStimParams;
+    for i=1:numStimuli
+        tmp = tmpStimParams{i};
+        tmp.radiusDeg = rMax;
+        tmpStimParams{i} = tmp;
+    end
+    predictionString{5} = 'HSV';
+    [correlationValsFull(5),correlationValsSelected(5),predictedPower] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices);
+    
+    if ~versionFlag
+        % Use HSVR (full model)
+        predictionString{6} = 'HSVR';
+        [correlationValsFull(6),correlationValsSelected(6),predictedPower] = getCorrelations(subjectName,allStimParams,allPower,selectedImageIndices); % Full model
+    else
+        % Use P & HSV+P (full model)
+        numElectrodes = length(RFdata.highRMSElectrodes);
+        if isfile(fullfile("savedData", "mismatchL2", subjectName, savedDataFile)) % When called by <analyzeData.m>, savedDataFile would either be a valid file, or a non-existent one
+            P = load(fullfile("savedData", "mismatchL2", subjectName, savedDataFile)).P_array(:, elecIdx);
+        elseif isfolder(fullfile("savedData", "mismatchL2", subjectName, savedDataFile)) % When called by <displaySCNI.m>, savedDataFile doesn't exist, and would simply result in pointing to the folder instead, no save file created
+            P = mismatchL2(allStimParams, rawImageFolder, imageIndices, RFdata, elecIdx);
+        else % Implies a call from <analyzeData.m> with a non-existent savedDataFile, proceeds to create one
+            if isempty(P_array), P_array = NaN*zeros([numStimuli, numElectrodes]); end
+            P = mismatchL2(allStimParams, rawImageFolder, imageIndices, RFdata, elecIdx);
+            P_array(:, elecIdx) = P;
+            if elecIdx == numElectrodes % On the last pass/electrode, P_array is saved to the save file
+                vars.P_array = P_array;
+                save(fullfile("savedData", "mismatchL2", subjectName, savedDataFile), "-struct", "vars")
+                P_array = []; % And reset to its original value, an empty array
+            end
+        end
+        rng("default") % Reset RNG before running crossValidate for reproducible results
+        P = crossValidate([ones(length(P), 1), P], allPower(:), 4); % 4-fold CV applied, ensures our linear regression model is not overfitting on P
+        predictionString{6} = 'P';
+        correlationValsFull(6) = corr(allPower(:), P);
+        predictionString{7} = 'HSV+P';
+        X = [ones(length(P), 1), predictedPower(:), P];
+        C = X\allPower(:);
+        predictedPower = X*C;
+        correlationValsFull(7) = corr(allPower(:), predictedPower(:));
+        correlationValsSelected = [];
+    end
+
 end
 
 function [rFull,rSelected,predictedPower] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices)
-numStimuli = length(tmpStimParams);
-
-predictedPower = zeros(1,numStimuli);
-for i=1:numStimuli
-    predictedPower(i) = getPredictedGamma(subjectName,tmpStimParams{i});
-end
-tmp = corrcoef(allPower,predictedPower);
-rFull = tmp(1,2);
-if length(selectedImageIndices)>2 % Need to have at least 3 data points. Otherwise correlations are trivially 1 or -1.
-    tmp = corrcoef(allPower(selectedImageIndices),predictedPower(selectedImageIndices));
-    rSelected = tmp(1,2);
-else
-    rSelected = 0;
-end
+    numStimuli = length(tmpStimParams);
+    
+    predictedPower = zeros(1,numStimuli);
+    for i=1:numStimuli
+        predictedPower(i) = getPredictedGamma(subjectName,tmpStimParams{i});
+    end
+    tmp = corrcoef(allPower,predictedPower);
+    rFull = tmp(1,2);
+    if length(selectedImageIndices)>2 % Need to have at least 3 data points. Otherwise correlations are trivially 1 or -1.
+        tmp = corrcoef(allPower(selectedImageIndices),predictedPower(selectedImageIndices));
+        rSelected = tmp(1,2);
+    else
+        rSelected = 0;
+    end
 end
